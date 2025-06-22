@@ -13,7 +13,33 @@
 
 ## 🚀 快速开始测试
 
-### 1. 启动后端服务
+### 1. 设置 LLM 服务
+
+#### 选项 A: 使用 Ollama（推荐用于测试，无需 API 密钥）
+
+```bash
+# 安装 Ollama
+brew install ollama
+
+# 下载模型
+ollama pull llama3.2
+
+# 启动 Ollama 服务
+ollama serve
+```
+
+配置已默认设置为使用 Ollama。详细设置请参考 `OLLAMA_SETUP.md`。
+
+#### 选项 B: 使用 OpenAI API
+
+编辑 `learn_mate_backend/.env.development`：
+```bash
+LLM_PROVIDER="openai"
+LLM_API_KEY="sk-your-actual-openai-api-key"
+LLM_MODEL="gpt-4o-mini"
+```
+
+### 2. 启动后端服务
 
 ```bash
 # 方法一：使用便捷脚本
@@ -32,13 +58,13 @@ INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 INFO:     Application startup complete.
 ```
 
-### 2. 验证后端服务
+### 3. 验证后端服务
 
 访问以下链接确认服务正常：
 - 健康检查: http://localhost:8000/health
 - API 文档: http://localhost:8000/docs
 
-### 3. 测试 Chrome 扩展
+### 4. 测试 Chrome 扩展
 
 #### 开发模式加载扩展：
 
