@@ -80,22 +80,43 @@ class AuthService {
 
   // 创建临时会话用户（无需真实注册）
   async createTemporarySession(): Promise<User> {
-    // 生成临时用户ID
+    // 生成临时用户ID和邮箱
     const tempUserId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const tempUser: User = { username: tempUserId };
+    const tempEmail = `${tempUserId}@temp.local`;
+    // 创建一个满足密码强度要求的临时密码
+    const tempPassword = `TempPass123!${Math.random().toString(36).substr(2, 4)}`;
+    const tempUser: User = { username: tempUserId, email: tempEmail };
     
     try {
       // 尝试注册临时用户
-      const response = await apiService.register(tempUserId, `${tempUserId}@temp.local`, 'temp_password');
-      this.setAuth(response.access_token, tempUser);
+      const userResponse = await apiService.register(tempUserId, tempEmail, tempPassword);
+      
+      // 设置用户token
+      apiService.setToken(userResponse.access_token);
+      
+      // 创建聊天会话
+      const sessionResponse = await apiService.createSession();
+      
+      // 使用会话token进行后续的聊天
+      this.setAuth(sessionResponse.token, tempUser);
       return tempUser;
     } catch (error) {
+      console.warn('Registration failed, attempting login:', error);
       // 如果注册失败，可能是因为用户已存在，尝试登录
       try {
-        const response = await apiService.login(tempUserId, 'temp_password');
-        this.setAuth(response.access_token, tempUser);
+        const loginResponse = await apiService.login(tempEmail, tempPassword);
+        
+        // 设置用户token
+        apiService.setToken(loginResponse.access_token);
+        
+        // 创建聊天会话
+        const sessionResponse = await apiService.createSession();
+        
+        // 使用会话token进行后续的聊天
+        this.setAuth(sessionResponse.token, tempUser);
         return tempUser;
       } catch (loginError) {
+        console.error('Both registration and login failed:', loginError);
         throw new Error('Failed to create temporary session');
       }
     }

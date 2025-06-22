@@ -63,7 +63,6 @@ class ApiService {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({
-        username,
         email,
         password,
       }),
@@ -74,7 +73,8 @@ class ApiService {
       throw new Error(error.detail || 'Registration failed');
     }
 
-    return response.json();
+    const data = await response.json();
+    return { access_token: data.token.access_token };
   }
 
   // 用户登录
@@ -82,6 +82,7 @@ class ApiService {
     const formData = new FormData();
     formData.append('username', username);
     formData.append('password', password);
+    formData.append('grant_type', 'password');
 
     const response = await fetch(`${this.baseUrl}/api/v1/auth/login`, {
       method: 'POST',
@@ -188,6 +189,25 @@ class ApiService {
 
     const data: ChatResponse = await response.json();
     return data.messages;
+  }
+
+  // 创建新的聊天会话
+  async createSession(): Promise<{ session_id: string; token: string }> {
+    const response = await fetch(`${this.baseUrl}/api/v1/auth/session`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to create session');
+    }
+
+    const data = await response.json();
+    return {
+      session_id: data.session_id,
+      token: data.token.access_token
+    };
   }
 
   // 清空聊天历史
