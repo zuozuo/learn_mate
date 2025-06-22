@@ -15,6 +15,7 @@ from langchain_core.messages import (
     convert_to_openai_messages,
 )
 from langchain_openai import ChatOpenAI
+from langchain_ollama import ChatOllama
 from langfuse.langchain import CallbackHandler
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import (
@@ -53,19 +54,74 @@ class LangGraphAgent:
 
     def __init__(self):
         """Initialize the LangGraph Agent with necessary components."""
-        # Use environment-specific LLM model
-        self.llm = ChatOpenAI(
-            model=settings.LLM_MODEL,
-            temperature=settings.DEFAULT_LLM_TEMPERATURE,
-            api_key=settings.LLM_API_KEY,
-            max_tokens=settings.MAX_TOKENS,
-            **self._get_model_kwargs(),
-        ).bind_tools(tools)
+        # Use environment-specific LLM model with provider support
+        self.llm = self._create_llm().bind_tools(tools)
         self.tools_by_name = {tool.name: tool for tool in tools}
         self._connection_pool: Optional[AsyncConnectionPool] = None
         self._graph: Optional[CompiledStateGraph] = None
 
-        logger.info("llm_initialized", model=settings.LLM_MODEL, environment=settings.ENVIRONMENT.value)
+        logger.info(
+            "llm_initialized", 
+            provider=settings.LLM_PROVIDER,
+            model=settings.LLM_MODEL, 
+            environment=settings.ENVIRONMENT.value
+        )
+
+    def _create_llm(self):
+        """Create LLM instance based on the configured provider.
+        
+        Returns:
+            Configured LLM instance (ChatOpenAI, ChatOllama, etc.)
+        """
+        provider = settings.LLM_PROVIDER.lower()
+        model_kwargs = self._get_model_kwargs()
+        
+        if provider == "openai":
+            return ChatOpenAI(
+                model=settings.LLM_MODEL,
+                temperature=settings.DEFAULT_LLM_TEMPERATURE,
+                api_key=settings.LLM_API_KEY,
+                max_tokens=settings.MAX_TOKENS,
+                base_url=settings.LLM_BASE_URL if settings.LLM_BASE_URL else None,
+                **model_kwargs,
+            )
+        
+        elif provider == "openrouter":
+            return ChatOpenAI(
+                model=settings.LLM_MODEL,
+                temperature=settings.DEFAULT_LLM_TEMPERATURE,
+                api_key=settings.OPENROUTER_API_KEY,
+                max_tokens=settings.MAX_TOKENS,
+                base_url=settings.OPENROUTER_BASE_URL,
+                default_headers={
+                    "HTTP-Referer": "https://learn-mate.ai",
+                    "X-Title": "Learn Mate"
+                },
+                **model_kwargs,
+            )
+        
+        elif provider == "ollama":
+            # Ollama doesn't use API keys and has different parameter structure
+            ollama_kwargs = {
+                "model": settings.LLM_MODEL,
+                "temperature": settings.DEFAULT_LLM_TEMPERATURE,
+                "base_url": settings.OLLAMA_BASE_URL,
+            }
+            # Note: Ollama may not support all OpenAI parameters
+            if "max_tokens" in model_kwargs:
+                ollama_kwargs["num_predict"] = settings.MAX_TOKENS
+            
+            return ChatOllama(**ollama_kwargs)
+        
+        else:
+            logger.warning(f"Unknown LLM provider: {provider}, falling back to OpenAI")
+            return ChatOpenAI(
+                model=settings.LLM_MODEL,
+                temperature=settings.DEFAULT_LLM_TEMPERATURE,
+                api_key=settings.LLM_API_KEY,
+                max_tokens=settings.MAX_TOKENS,
+                **model_kwargs,
+            )
 
     def _get_model_kwargs(self) -> Dict[str, Any]:
         """Get environment-specific model kwargs.
