@@ -807,14 +807,79 @@ const NewTab = () => {
                                     const lastUserMessageIndex = messages.findLastIndex(m => m.role === 'user');
                                     if (lastUserMessageIndex >= 0) {
                                       // 保留到最后一条用户消息为止的所有消息
-                                      setMessages(messages.slice(0, lastUserMessageIndex + 1));
+                                      setMessages(messages.slice(0, lastUserMessageIndex));
                                       // 清空thinking内容
                                       setThinkingContent('');
                                       setShowThinking(false);
-                                      // 重新发送最后的用户消息
-                                      const lastUserMessage = messages[lastUserMessageIndex].content;
-                                      setInputMessage(lastUserMessage);
-                                      setTimeout(() => sendMessage(), 100);
+                                      // 直接使用最后的用户消息内容发送，不需要设置inputMessage
+                                      const lastUserMessageContent = messages[lastUserMessageIndex].content;
+                                      
+                                      // 创建新的用户消息
+                                      const userMessage = {
+                                        role: 'user' as const,
+                                        content: lastUserMessageContent,
+                                      };
+                                      
+                                      const messageWithTimestamp = { ...userMessage, timestamp: new Date() };
+                                      setMessages(prev => [...prev, messageWithTimestamp]);
+                                      setIsLoading(true);
+                                      
+                                      // 立即添加空的assistant消息
+                                      const emptyAssistantMessage = {
+                                        role: 'assistant' as const,
+                                        content: '',
+                                        timestamp: new Date()
+                                      };
+                                      setMessages(prev => [...prev, emptyAssistantMessage]);
+                                      
+                                      // 发送请求
+                                      const allMessages = [...messages.slice(0, lastUserMessageIndex), userMessage];
+                                      
+                                      // 重置状态并显示thinking
+                                      streamParserRef.current = new StreamParser();
+                                      setThinkingContent('');
+                                      setShowThinking(true);
+                                      setIsThinking(true);
+                                      setIsThinkingExpanded(true);
+                                      
+                                      // 发送流式请求
+                                      apiService.sendMessageStream(
+                                        allMessages,
+                                        (chunk: string) => {
+                                          const parsed = streamParserRef.current!.processChunk(chunk);
+                                          
+                                          if (parsed.thinking) {
+                                            setThinkingContent(prev => prev + parsed.thinking);
+                                          }
+                                          
+                                          if (parsed.thinkingComplete) {
+                                            setIsThinking(false);
+                                            setTimeout(() => {
+                                              setIsThinkingExpanded(false);
+                                            }, 500);
+                                          }
+                                          
+                                          if (parsed.response) {
+                                            setMessages(prev => {
+                                              const newMessages = [...prev];
+                                              const lastMessage = newMessages[newMessages.length - 1];
+                                              if (lastMessage.role === 'assistant') {
+                                                lastMessage.content = lastMessage.content + parsed.response;
+                                              }
+                                              return newMessages;
+                                            });
+                                          }
+                                        },
+                                        () => {
+                                          setIsLoading(false);
+                                          setIsThinking(false);
+                                        },
+                                        (error: Error) => {
+                                          console.error('Stream error:', error);
+                                          setIsLoading(false);
+                                          setIsThinking(false);
+                                        }
+                                      );
                                     }
                                   }}
                                   className={cn(
