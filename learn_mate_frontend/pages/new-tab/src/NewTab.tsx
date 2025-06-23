@@ -679,59 +679,73 @@ const NewTab = () => {
                                 ? 'bg-gray-50 border-gray-200' 
                                 : 'bg-gray-800 border-gray-700'
                             )}>
-                              {/* Header */}
-                              <div className="px-4 py-3 flex items-center justify-between">
-                                <h3 className={cn(
-                                  'text-base font-medium',
-                                  isLight ? 'text-gray-900' : 'text-gray-100'
-                                )}>
-                                  Thought process
-                                </h3>
-                                <div className="flex items-center gap-2">
+                              {isThinkingExpanded ? (
+                                <>
+                                  {/* Header - 只在展开时显示 */}
+                                  <div className="px-4 py-3 flex items-center justify-between">
+                                    <h3 className={cn(
+                                      'text-base font-medium',
+                                      isLight ? 'text-gray-900' : 'text-gray-100'
+                                    )}>
+                                      Thought process
+                                    </h3>
+                                    <div className="flex items-center gap-2">
+                                      <span className={cn(
+                                        'text-sm',
+                                        isLight ? 'text-gray-500' : 'text-gray-400'
+                                      )}>
+                                        1s
+                                      </span>
+                                      <button
+                                        onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
+                                        className={cn(
+                                          'p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors',
+                                          isLight ? 'text-gray-600' : 'text-gray-400'
+                                        )}
+                                      >
+                                        <svg className={cn('w-5 h-5 transition-transform', isThinkingExpanded && 'rotate-180')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Content */}
+                                  <div className={cn(
+                                    'px-4 pb-3 text-sm leading-relaxed',
+                                    isLight ? 'text-gray-700' : 'text-gray-300'
+                                  )}>
+                                    {thinkingContent}
+                                  </div>
+                                </>
+                              ) : (
+                                /* Collapsed content - 无header，可点击整个区域展开 */
+                                <button
+                                  onClick={() => setIsThinkingExpanded(true)}
+                                  className={cn(
+                                    'w-full text-left px-4 py-3 flex items-center justify-between group',
+                                    'hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors'
+                                  )}
+                                >
                                   <span className={cn(
-                                    'text-sm',
+                                    'text-sm leading-relaxed flex-1',
+                                    isLight ? 'text-gray-700' : 'text-gray-300'
+                                  )}>
+                                    {(() => {
+                                      // 获取第一句话（到句号、感叹号或问号为止）
+                                      const firstSentence = thinkingContent.match(/^[^.!?]+[.!?]/)?.[0] || thinkingContent.split('\n')[0];
+                                      return firstSentence.length < thinkingContent.length 
+                                        ? firstSentence + '...' 
+                                        : firstSentence;
+                                    })()}
+                                  </span>
+                                  <span className={cn(
+                                    'text-sm ml-2 shrink-0',
                                     isLight ? 'text-gray-500' : 'text-gray-400'
                                   )}>
                                     1s
                                   </span>
-                                  <button
-                                    onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
-                                    className={cn(
-                                      'p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors',
-                                      isLight ? 'text-gray-600' : 'text-gray-400'
-                                    )}
-                                  >
-                                    <svg className={cn('w-5 h-5 transition-transform', isThinkingExpanded && 'rotate-180')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                  </button>
-                                </div>
-                              </div>
-                              
-                              {/* Content */}
-                              {isThinkingExpanded && (
-                                <div className={cn(
-                                  'px-4 pb-3 text-sm leading-relaxed',
-                                  isLight ? 'text-gray-700' : 'text-gray-300'
-                                )}>
-                                  {thinkingContent}
-                                </div>
-                              )}
-                              
-                              {/* Collapsed content - show first sentence */}
-                              {!isThinkingExpanded && (
-                                <div className={cn(
-                                  'px-4 pb-3 text-sm leading-relaxed',
-                                  isLight ? 'text-gray-700' : 'text-gray-300'
-                                )}>
-                                  {(() => {
-                                    // 获取第一句话（到句号、感叹号或问号为止）
-                                    const firstSentence = thinkingContent.match(/^[^.!?]+[.!?]/)?.[0] || thinkingContent.split('\n')[0];
-                                    return firstSentence.length < thinkingContent.length 
-                                      ? firstSentence + '...' 
-                                      : firstSentence;
-                                  })()}
-                                </div>
+                                </button>
                               )}
                             </div>
                           )}
