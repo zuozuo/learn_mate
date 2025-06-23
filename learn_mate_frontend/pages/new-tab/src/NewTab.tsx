@@ -721,7 +721,7 @@ const NewTab = () => {
                         </div>
                       ) : (
                         /* Assistant消息 - 无头像，简化设计 */
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                           {/* Thinking 卡片 - 在response上方 */}
                           {isLastMessage && thinkingContent && (
                             <div className={cn(
