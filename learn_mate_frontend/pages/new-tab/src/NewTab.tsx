@@ -740,7 +740,7 @@ const NewTab = () => {
                                     <button
                                       onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
                                       className={cn(
-                                        'w-full px-4 py-3 flex items-center justify-between animate-fadeIn',
+                                        'w-full px-4 pt-3 pb-2 flex items-center justify-between animate-fadeIn',
                                         'hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors'
                                       )}
                                     >
@@ -765,7 +765,7 @@ const NewTab = () => {
                                     
                                     {/* Content */}
                                     <div className={cn(
-                                      'px-4 pb-4 text-sm leading-relaxed animate-fadeIn thinking-content',
+                                      'px-4 pt-1 pb-4 text-sm leading-relaxed animate-fadeIn thinking-content',
                                       isLight ? 'text-gray-700' : 'text-gray-300 dark'
                                     )}>
                                       {formatContent(thinkingContent)}
