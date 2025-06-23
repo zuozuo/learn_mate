@@ -112,6 +112,11 @@ async def chat_stream(
             """
             try:
                 full_response = ""
+                thinking_content = ""
+                response_content = ""
+                in_thinking = False
+                thinking_sent = False
+                
                 # Get model name based on LLM provider
                 model_name = getattr(agent.llm, 'model_name', None) or getattr(agent.llm, 'model', 'unknown')
                 with llm_stream_duration_seconds.labels(model=model_name).time():
@@ -119,8 +124,51 @@ async def chat_stream(
                         chat_request.messages, session.id, user_id=session.user_id
                      ):
                         full_response += chunk
-                        response = StreamResponse(content=chunk, done=False)
-                        yield f"data: {json.dumps(response.model_dump())}\n\n"
+                        
+                        # 解析 thinking 标签
+                        if "<think>" in chunk and not in_thinking:
+                            in_thinking = True
+                            # 发送 thinking 开始前的内容（如果有）
+                            if "<think>" not in chunk.split("<think>")[0]:
+                                content_before = chunk.split("<think>")[0]
+                                if content_before.strip():
+                                    response = StreamResponse(content=content_before, done=False, type="response")
+                                    yield f"data: {json.dumps(response.model_dump())}\n\n"
+                            # 开始发送 thinking 内容
+                            thinking_part = chunk.split("<think>", 1)[-1]
+                            if thinking_part:
+                                thinking_content += thinking_part
+                                response = StreamResponse(content=thinking_part, done=False, type="thinking")
+                                yield f"data: {json.dumps(response.model_dump())}\n\n"
+                        elif "</think>" in chunk and in_thinking:
+                            # thinking 结束
+                            parts = chunk.split("</think>", 1)
+                            thinking_part = parts[0]
+                            thinking_content += thinking_part
+                            if thinking_part:
+                                response = StreamResponse(content=thinking_part, done=False, type="thinking")
+                                yield f"data: {json.dumps(response.model_dump())}\n\n"
+                            
+                            thinking_sent = True
+                            in_thinking = False
+                            
+                            # 发送 thinking 后的内容
+                            if len(parts) > 1:
+                                response_part = parts[1]
+                                if response_part.strip():
+                                    response_content += response_part
+                                    response = StreamResponse(content=response_part, done=False, type="response")
+                                    yield f"data: {json.dumps(response.model_dump())}\n\n"
+                        elif in_thinking:
+                            # 在 thinking 中
+                            thinking_content += chunk
+                            response = StreamResponse(content=chunk, done=False, type="thinking")
+                            yield f"data: {json.dumps(response.model_dump())}\n\n"
+                        else:
+                            # 普通回复内容
+                            response_content += chunk
+                            response = StreamResponse(content=chunk, done=False, type="response")
+                            yield f"data: {json.dumps(response.model_dump())}\n\n"
 
                 # Send final message indicating completion
                 final_response = StreamResponse(content="", done=True)
