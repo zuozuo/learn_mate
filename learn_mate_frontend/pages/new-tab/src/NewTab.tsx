@@ -145,7 +145,7 @@ const NewTab = () => {
   const [thinkingContent, setThinkingContent] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [showThinking, setShowThinking] = useState(false);
-  const [isThinkingExpanded, setIsThinkingExpanded] = useState(true);
+  const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const streamParserRef = useRef<StreamParser | null>(null);
@@ -640,139 +640,173 @@ const NewTab = () => {
             {/* 消息列表 */}
             <div className="flex-1 overflow-y-auto">
               <div className="max-w-4xl mx-auto px-8 py-8 space-y-8">
-                {messages.map((message, index) => (
-                  <div key={index} className="flex items-start space-x-4">
-                    {/* 头像 */}
-                    <div className={cn(
-                      'w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold shrink-0',
-                      message.role === 'user'
-                        ? isLight 
-                          ? 'bg-gray-600 text-white' 
-                          : 'bg-gray-700 text-white'
-                        : isLight 
-                          ? 'bg-orange-100 text-orange-600' 
-                          : 'bg-orange-500/20 text-orange-400'
-                    )}>
-                      {message.role === 'user' ? 'Z' : '🎓'}
-                    </div>
-                    
-                    {/* 消息内容 */}
-                    <div className="flex-1 min-w-0">
-                      <div className={cn(
-                        'rounded-2xl px-6 py-4',
-                        message.role === 'user' 
-                          ? isLight 
-                            ? 'bg-gray-100 text-gray-900' 
-                            : 'bg-gray-800 text-gray-100'
-                          : isLight 
-                            ? 'bg-gray-100 text-gray-900' 
-                            : 'bg-gray-800 text-gray-100'
-                      )}>
-                        <div className="whitespace-pre-wrap break-words leading-relaxed">
-                          {message.content}
-                          {/* 如果是assistant消息且内容为空且正在加载，显示loading指示器 */}
-                          {message.role === 'assistant' && !message.content && isLoading && (
-                            <div className="flex items-center space-x-2 text-sm opacity-70">
-                              <div className="flex space-x-1">
-                                <div className={cn(
-                                  'w-1.5 h-1.5 rounded-full thinking-dot',
-                                  isLight ? 'bg-orange-500' : 'bg-orange-400'
-                                )}></div>
-                                <div className={cn(
-                                  'w-1.5 h-1.5 rounded-full thinking-dot',
-                                  isLight ? 'bg-orange-500' : 'bg-orange-400'
-                                )}></div>
-                                <div className={cn(
-                                  'w-1.5 h-1.5 rounded-full thinking-dot',
-                                  isLight ? 'bg-orange-500' : 'bg-orange-400'
-                                )}></div>
-                              </div>
-                              <span>正在回复...</span>
+                {messages.map((message, index) => {
+                  const isLastMessage = index === messages.length - 1;
+                  const isAssistantMessage = message.role === 'assistant';
+                  
+                  return (
+                    <div key={index} className={cn("mb-6", isLastMessage && "mb-0")}>
+                      {message.role === 'user' ? (
+                        /* 用户消息 - 头像在卡片内部 */
+                        <div className="flex justify-end">
+                          <div className={cn(
+                            'max-w-2xl rounded-2xl px-4 py-3 flex items-start gap-3',
+                            isLight ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'
+                          )}>
+                            <div className={cn(
+                              'w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5',
+                              isLight ? 'bg-gray-700 text-white' : 'bg-gray-300 text-gray-700'
+                            )}>
+                              Z
+                            </div>
+                            <div className="whitespace-pre-wrap break-words leading-relaxed">
+                              {message.content}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Assistant消息 - 无头像，简化设计 */
+                        <div className="space-y-3">
+                          {/* Thinking 卡片 - 在response上方 */}
+                          {isLastMessage && thinkingContent && (
+                            <div className={cn(
+                              'rounded-lg border px-4 py-2',
+                              isLight 
+                                ? 'bg-gray-50 border-gray-200' 
+                                : 'bg-gray-800 border-gray-700'
+                            )}>
+                              <button
+                                onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
+                                className="w-full text-left flex items-center justify-between"
+                              >
+                                <span className={cn(
+                                  'text-sm',
+                                  isLight ? 'text-gray-600' : 'text-gray-400'
+                                )}>
+                                  {isThinkingExpanded 
+                                    ? thinkingContent 
+                                    : (thinkingContent.split('\n')[0] + (thinkingContent.includes('\n') ? '...' : ''))
+                                  }
+                                </span>
+                                <span className={cn(
+                                  'text-xs ml-2 shrink-0',
+                                  isLight ? 'text-gray-500' : 'text-gray-500'
+                                )}>
+                                  {isThinkingExpanded ? '1s' : `${thinkingContent.split('\n').length}s`}
+                                </span>
+                              </button>
                             </div>
                           )}
-                        </div>
-                        {message.timestamp && (
-                          <div className={cn('text-xs mt-2 opacity-70')}>
-                            {message.timestamp.toLocaleTimeString()}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                
-                {/* Thinking 卡片 - 独立显示，与消息分离 */}
-                {(showThinking || thinkingContent) && (
-                  <div className="mb-6">
-                    <div className={cn(
-                      'rounded-xl border px-4 py-3 loading-message',
-                      isLight 
-                        ? 'bg-blue-50 border-blue-200' 
-                        : 'bg-blue-500/10 border-blue-500/20'
-                    )}>
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center space-x-3">
-                          <div className="flex space-x-1">
-                            {isThinking ? (
-                              <>
-                                <div className={cn(
-                                  'w-1.5 h-1.5 rounded-full thinking-dot',
-                                  isLight ? 'bg-blue-500' : 'bg-blue-400'
-                                )}></div>
-                                <div className={cn(
-                                  'w-1.5 h-1.5 rounded-full thinking-dot',
-                                  isLight ? 'bg-blue-500' : 'bg-blue-400'
-                                )}></div>
-                                <div className={cn(
-                                  'w-1.5 h-1.5 rounded-full thinking-dot',
-                                  isLight ? 'bg-blue-500' : 'bg-blue-400'
-                                )}></div>
-                              </>
-                            ) : (
-                              <div className={cn(
-                                'w-4 h-4 rounded-full flex items-center justify-center',
-                                isLight ? 'bg-blue-100 text-blue-600' : 'bg-blue-500/20 text-blue-400'
-                              )}>
-                                🧠
+                          
+                          {/* Response内容 */}
+                          <div className="max-w-4xl">
+                            <div className={cn(
+                              'text-sm leading-relaxed',
+                              isLight ? 'text-gray-900' : 'text-gray-100'
+                            )}>
+                              {message.content || (
+                                isLoading && isLastMessage && (
+                                  <span className="inline-block w-2 h-4 bg-current animate-pulse" />
+                                )
+                              )}
+                            </div>
+                            
+                            {/* 底部操作栏 */}
+                            {isLastMessage && message.content && (
+                              <div className="flex items-center gap-1 mt-3">
+                                {/* Loading spinner */}
+                                {isLoading && (
+                                  <div className={cn(
+                                    'w-6 h-6 flex items-center justify-center',
+                                    isLight ? 'text-orange-500' : 'text-orange-400'
+                                  )}>
+                                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                    </svg>
+                                  </div>
+                                )}
+                                
+                                {/* Copy button */}
+                                <button
+                                  onClick={() => navigator.clipboard.writeText(message.content)}
+                                  className={cn(
+                                    'p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors',
+                                    isLight ? 'text-gray-500 hover:text-gray-700' : 'text-gray-400 hover:text-gray-200'
+                                  )}
+                                  title="复制"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                  </svg>
+                                </button>
+                                
+                                {/* Thumbs up */}
+                                <button
+                                  className={cn(
+                                    'p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors',
+                                    isLight ? 'text-gray-500 hover:text-gray-700' : 'text-gray-400 hover:text-gray-200'
+                                  )}
+                                  title="有帮助"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
+                                  </svg>
+                                </button>
+                                
+                                {/* Thumbs down */}
+                                <button
+                                  className={cn(
+                                    'p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors',
+                                    isLight ? 'text-gray-500 hover:text-gray-700' : 'text-gray-400 hover:text-gray-200'
+                                  )}
+                                  title="无帮助"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
+                                  </svg>
+                                </button>
+                                
+                                {/* Retry button */}
+                                <button
+                                  onClick={() => {
+                                    // 获取上一个用户消息进行重试
+                                    const lastUserMessageIndex = messages.slice(0, -1).findLastIndex(m => m.role === 'user');
+                                    if (lastUserMessageIndex >= 0) {
+                                      const lastUserMessage = messages[lastUserMessageIndex];
+                                      setMessages(messages.slice(0, lastUserMessageIndex + 1));
+                                      setInputMessage(lastUserMessage.content);
+                                      setTimeout(() => sendMessage(), 100);
+                                    }
+                                  }}
+                                  className={cn(
+                                    'p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center gap-1',
+                                    isLight ? 'text-gray-500 hover:text-gray-700' : 'text-gray-400 hover:text-gray-200'
+                                  )}
+                                  title="重试"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                  </svg>
+                                  <span className="text-xs">Retry</span>
+                                </button>
+                                
+                                {/* Disclaimer text */}
+                                <span className={cn(
+                                  'text-xs ml-auto',
+                                  isLight ? 'text-gray-400' : 'text-gray-500'
+                                )}>
+                                  Claude can make mistakes. Please double-check responses.
+                                </span>
                               </div>
                             )}
                           </div>
-                          <span className={cn(
-                            'text-sm font-medium',
-                            isLight ? 'text-blue-700' : 'text-blue-300'
-                          )}>
-                            {isThinking ? 'Thinking...' : 'Thought process'}
-                          </span>
                         </div>
-                        
-                        {/* 展开收起按钮 */}
-                        {(thinkingContent && !isThinking) && (
-                          <button
-                            onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
-                            className={cn(
-                              'text-xs px-2 py-1 rounded transition-colors',
-                              isLight 
-                                ? 'text-blue-600 hover:bg-blue-100' 
-                                : 'text-blue-400 hover:bg-blue-500/10'
-                            )}
-                          >
-                            {isThinkingExpanded ? '收起' : '展开'}
-                          </button>
-                        )}
-                      </div>
-                      
-                      {/* 思考内容 */}
-                      <div className={cn(
-                        'text-sm leading-relaxed whitespace-pre-wrap transition-all duration-200',
-                        isLight ? 'text-blue-800' : 'text-blue-200'
-                      )}>
-                        {isThinkingExpanded ? thinkingContent : 
-                          (thinkingContent ? `${thinkingContent.slice(0, 100)}${thinkingContent.length > 100 ? '...' : ''}` : '')
-                        }
-                      </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })}
+                
                 
                 <div ref={messagesEndRef} />
               </div>
