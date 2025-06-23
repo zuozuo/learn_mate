@@ -66,3 +66,109 @@ h6 {
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-out;
 }
+
+// Thinking内容样式优化
+.thinking-content {
+  // 优化段落间距 - 更紧凑的间距
+  p {
+    margin-bottom: 0.5rem;
+    line-height: 1.5;
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+  
+  // 代码块样式
+  pre {
+    background-color: #f6f8fa;
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    overflow-x: auto;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    
+    &:last-child {
+      margin-bottom: 0;
+    }
+    
+    code {
+      background: none;
+      padding: 0;
+      font-size: inherit;
+    }
+  }
+  
+  // 行内代码样式
+  code {
+    background-color: rgba(0, 0, 0, 0.05);
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.875em;
+  }
+  
+  // 深色模式
+  &.dark {
+    pre {
+      background-color: #1e1e1e;
+    }
+    
+    code {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+  }
+}
+
+// Response内容样式
+.response-content {
+  // 段落间距 - 适中的间距
+  p {
+    margin-bottom: 0.875rem;
+    line-height: 1.6;
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+  
+  // 代码块样式
+  pre {
+    background-color: #f6f8fa;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    margin-bottom: 0.875rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    
+    &:last-child {
+      margin-bottom: 0;
+    }
+    
+    code {
+      background: none;
+      padding: 0;
+      font-size: inherit;
+    }
+  }
+  
+  // 行内代码
+  code {
+    background-color: rgba(0, 0, 0, 0.05);
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.875em;
+  }
+  
+  // 深色模式
+  &.dark {
+    pre {
+      background-color: #1e1e1e;
+    }
+    
+    code {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+  }
+}

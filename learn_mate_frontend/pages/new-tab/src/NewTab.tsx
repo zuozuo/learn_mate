@@ -157,6 +157,17 @@ const NewTab = () => {
     if (hour < 18) return "下午好";
     return "晚上好";
   };
+  
+  // 格式化内容，将段落分隔并处理代码
+  const formatContent = (content: string) => {
+    // 将双换行替换为段落标签，单换行保留
+    const paragraphs = content.split('\n\n');
+    return paragraphs.map((para, index) => {
+      // 替换行内代码
+      const formattedPara = para.replace(/`([^`]+)`/g, '<code>$1</code>');
+      return <p key={index} dangerouslySetInnerHTML={{ __html: formattedPara }} />;
+    });
+  };
 
   // 自动滚动到底部
   const scrollToBottom = () => {
@@ -382,6 +393,43 @@ const NewTab = () => {
       setMessages(prev => [...prev, errorMessage]);
       setIsLoading(false);
     }
+  };
+
+  // 格式化内容，处理段落和代码块
+  const formatContent = (content: string): React.ReactNode => {
+    // 将文本分割为段落
+    const paragraphs = content.split(/\n{2,}/); // 两个或更多换行符分割段落
+    
+    return paragraphs.map((paragraph, index) => {
+      // 检查是否是代码块
+      if (paragraph.startsWith('```')) {
+        const lines = paragraph.split('\n');
+        const language = lines[0].slice(3).trim();
+        const code = lines.slice(1, -1).join('\n');
+        
+        return (
+          <pre key={index} className="mb-3 last:mb-0">
+            <code className={language ? `language-${language}` : ''}>
+              {code}
+            </code>
+          </pre>
+        );
+      }
+      
+      // 处理普通段落
+      // 移除单个换行符，保留段落结构
+      const cleanedParagraph = paragraph.replace(/(?<!\n)\n(?!\n)/g, ' ').trim();
+      
+      if (cleanedParagraph) {
+        return (
+          <p key={index} className="mb-3 last:mb-0">
+            {cleanedParagraph}
+          </p>
+        );
+      }
+      
+      return null;
+    }).filter(Boolean);
   };
 
   // 处理键盘事件
@@ -717,10 +765,10 @@ const NewTab = () => {
                                     
                                     {/* Content */}
                                     <div className={cn(
-                                      'px-4 pb-3 text-sm leading-relaxed animate-fadeIn whitespace-pre-wrap',
-                                      isLight ? 'text-gray-700' : 'text-gray-300'
+                                      'px-4 pb-3 text-sm leading-relaxed animate-fadeIn thinking-content',
+                                      isLight ? 'text-gray-700' : 'text-gray-300 dark'
                                     )}>
-                                      {thinkingContent}
+                                      {formatContent(thinkingContent)}
                                     </div>
                                   </>
                                 ) : (
@@ -759,10 +807,10 @@ const NewTab = () => {
                           {/* Response内容 */}
                           <div className="max-w-4xl">
                             <div className={cn(
-                              'text-base leading-relaxed whitespace-pre-wrap',
-                              isLight ? 'text-gray-900' : 'text-gray-100'
+                              'text-base leading-relaxed response-content',
+                              isLight ? 'text-gray-900' : 'text-gray-100 dark'
                             )}>
-                              {message.content || (
+                              {message.content ? formatContent(message.content) : (
                                 isLoading && isLastMessage && (
                                   <span className="inline-block w-2 h-4 bg-current animate-pulse" />
                                 )
