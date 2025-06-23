@@ -81,9 +81,7 @@ class StreamResponse(BaseModel):
     Attributes:
         content: The content of the current chunk.
         done: Whether the stream is complete.
-        type: The type of content (thinking or response).
     """
 
     content: str = Field(default="", description="The content of the current chunk")
     done: bool = Field(default=False, description="Whether the stream is complete")
-    type: Literal["thinking", "response"] = Field(default="response", description="The type of content")

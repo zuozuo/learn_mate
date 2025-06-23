@@ -39,6 +39,7 @@ dependencies = [
     "colorama>=0.4.6",
     "transformers>=4.46.0",
     "torch>=2.0.0",
+    "ipython>=9.3.0",
 ]
 
 [tool.setuptools.packages.find]

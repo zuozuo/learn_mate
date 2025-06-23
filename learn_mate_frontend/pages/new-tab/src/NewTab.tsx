@@ -8,6 +8,84 @@ import { useState, useRef, useEffect } from 'react';
 import { apiService, type Message } from './services/api';
 import { authService, type User } from './services/auth';
 
+// Stream Parser for handling <think> tags
+class StreamParser {
+  private buffer: string = '';
+  private isInThinking: boolean = false;
+  private thinkingContent: string = '';
+  private responseContent: string = '';
+
+  // Process a new chunk and return the thinking and response parts
+  processChunk(chunk: string): { thinking: string; response: string; thinkingComplete: boolean } {
+    this.buffer += chunk;
+    let result = { thinking: '', response: '', thinkingComplete: false };
+
+    // Check for <think> start tag
+    if (!this.isInThinking && this.buffer.includes('<think>')) {
+      const parts = this.buffer.split('<think>');
+      // Content before <think> goes to response
+      if (parts[0]) {
+        this.responseContent += parts[0];
+        result.response = parts[0];
+      }
+      
+      // Start thinking mode
+      this.isInThinking = true;
+      this.buffer = parts.slice(1).join('<think>'); // Keep everything after first <think>
+    }
+
+    // Check for </think> end tag
+    if (this.isInThinking && this.buffer.includes('</think>')) {
+      const parts = this.buffer.split('</think>');
+      // Content before </think> goes to thinking
+      this.thinkingContent += parts[0];
+      result.thinking = parts[0];
+      result.thinkingComplete = true;
+      
+      // End thinking mode
+      this.isInThinking = false;
+      
+      // Content after </think> goes to response
+      const afterThinking = parts.slice(1).join('</think>');
+      if (afterThinking) {
+        this.responseContent += afterThinking;
+        result.response = (result.response || '') + afterThinking;
+      }
+      
+      this.buffer = '';
+    } else if (this.isInThinking) {
+      // We're in thinking mode but haven't found closing tag yet
+      // All content goes to thinking
+      this.thinkingContent += this.buffer;
+      result.thinking = this.buffer;
+      this.buffer = '';
+    } else {
+      // We're in response mode
+      this.responseContent += this.buffer;
+      result.response = (result.response || '') + this.buffer;
+      this.buffer = '';
+    }
+
+    return result;
+  }
+
+  // Get the accumulated content
+  getContent(): { thinking: string; response: string } {
+    return {
+      thinking: this.thinkingContent,
+      response: this.responseContent
+    };
+  }
+
+  // Reset the parser
+  reset(): void {
+    this.buffer = '';
+    this.isInThinking = false;
+    this.thinkingContent = '';
+    this.responseContent = '';
+  }
+}
+
 const NewTab = () => {
   const { isLight } = useStorage(exampleThemeStorage);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -19,12 +97,11 @@ const NewTab = () => {
   const [useStream, setUseStream] = useState(true);
   const [thinkingContent, setThinkingContent] = useState('');
   const [isThinking, setIsThinking] = useState(false);
-  const [currentThinking, setCurrentThinking] = useState(''); // 当前正在接收的thinking内容
-  const [showThinking, setShowThinking] = useState(false); // 是否显示thinking卡片
-  const [isThinkingExpanded, setIsThinkingExpanded] = useState(true); // thinking卡片是否展开
+  const [showThinking, setShowThinking] = useState(false);
+  const [isThinkingExpanded, setIsThinkingExpanded] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const currentThinkingRef = useRef(''); // 用于在闭包中获取最新的thinking内容
+  const streamParserRef = useRef<StreamParser | null>(null);
 
   // 获取问候语
   const getGreeting = () => {
@@ -125,84 +202,85 @@ const NewTab = () => {
 
       if (useStream) {
         // 使用流式响应
-        let assistantContent = '';
-        let hasReceivedThinking = false;
+        streamParserRef.current = new StreamParser();
+        let assistantMessageAdded = false;
         
         // 重置状态
-        setCurrentThinking('');
+        setThinkingContent('');
         setShowThinking(false);
         setIsThinking(false);
-        currentThinkingRef.current = '';
         
         await apiService.sendMessageStream(
           allMessages,
-          // thinking 内容流式更新
-          (thinkingChunk: string) => {
-            if (!hasReceivedThinking) {
-              hasReceivedThinking = true;
-              setShowThinking(true);
-              setIsThinking(true);
-            }
-            currentThinkingRef.current += thinkingChunk;
-            setCurrentThinking(prev => prev + thinkingChunk);
-          },
-          // response 内容流式更新
-          (responseChunk: string) => {
-            // 如果是第一个 response chunk，说明 thinking 阶段结束，开始response
-            if (assistantContent === '') {
-              setIsThinking(false); // thinking阶段结束
-              // 保存thinking内容到thinkingContent用于显示
-              setThinkingContent(currentThinkingRef.current);
-              
-              const assistantMessage = { 
-                role: 'assistant' as const, 
-                content: '', 
-                timestamp: new Date() 
-              };
-              setMessages(prev => [...prev, assistantMessage]);
+          // 统一的chunk处理函数
+          (chunk: string) => {
+            const parsed = streamParserRef.current!.processChunk(chunk);
+            
+            // 处理thinking内容
+            if (parsed.thinking) {
+              if (!showThinking) {
+                setShowThinking(true);
+                setIsThinking(true);
+              }
+              setThinkingContent(prev => prev + parsed.thinking);
             }
             
-            assistantContent += responseChunk;
-            setMessages(prev => {
-              const newMessages = [...prev];
-              const lastMessage = newMessages[newMessages.length - 1];
-              if (lastMessage.role === 'assistant') {
-                lastMessage.content = assistantContent;
+            // thinking完成时停止thinking状态
+            if (parsed.thinkingComplete) {
+              setIsThinking(false);
+            }
+            
+            // 处理response内容
+            if (parsed.response) {
+              // 如果还没有添加assistant消息，添加一个
+              if (!assistantMessageAdded) {
+                assistantMessageAdded = true;
+                const assistantMessage = { 
+                  role: 'assistant' as const, 
+                  content: parsed.response, 
+                  timestamp: new Date() 
+                };
+                setMessages(prev => [...prev, assistantMessage]);
+              } else {
+                // 更新现有的assistant消息
+                setMessages(prev => {
+                  const newMessages = [...prev];
+                  const lastMessage = newMessages[newMessages.length - 1];
+                  if (lastMessage.role === 'assistant') {
+                    lastMessage.content += parsed.response;
+                  }
+                  return newMessages;
+                });
               }
-              return newMessages;
-            });
+            }
           },
           () => {
             setIsLoading(false);
             setIsThinking(false);
-            // 保存thinking内容，不要清空
-            if (hasReceivedThinking && currentThinkingRef.current) {
-              setThinkingContent(currentThinkingRef.current);
-            }
           },
           (error: Error) => {
             console.error('Stream error:', error);
             setIsLoading(false);
             setIsThinking(false);
-            // 保留thinking内容，不要清空
             
-            // 如果还没有添加助手消息，先添加一个
-            setMessages(prev => {
-              const newMessages = [...prev];
-              const lastMessage = newMessages[newMessages.length - 1];
-              
-              if (!lastMessage || lastMessage.role !== 'assistant') {
-                newMessages.push({
-                  role: 'assistant' as const,
-                  content: '抱歉，发生了错误。请稍后重试。',
-                  timestamp: new Date()
-                });
-              } else if (!lastMessage.content) {
-                lastMessage.content = '抱歉，发生了错误。请稍后重试。';
-              }
-              
-              return newMessages;
-            });
+            // 如果还没有添加助手消息，先添加一个错误消息
+            if (!assistantMessageAdded) {
+              setMessages(prev => [...prev, {
+                role: 'assistant' as const,
+                content: '抱歉，发生了错误。请稍后重试。',
+                timestamp: new Date()
+              }]);
+            } else {
+              // 更新现有消息为错误状态
+              setMessages(prev => {
+                const newMessages = [...prev];
+                const lastMessage = newMessages[newMessages.length - 1];
+                if (lastMessage.role === 'assistant' && !lastMessage.content) {
+                  lastMessage.content = '抱歉，发生了错误。请稍后重试。';
+                }
+                return newMessages;
+              });
+            }
           }
         );
       } else {
@@ -258,19 +336,21 @@ const NewTab = () => {
       setMessages([]);
       // 清空thinking相关状态
       setThinkingContent('');
-      setCurrentThinking('');
       setShowThinking(false);
       setIsThinking(false);
-      currentThinkingRef.current = '';
+      if (streamParserRef.current) {
+        streamParserRef.current.reset();
+      }
     } catch (error) {
       console.error('Failed to clear chat history:', error);
       // 即使清空失败，也清空本地消息
       setMessages([]);
       setThinkingContent('');
-      setCurrentThinking('');
       setShowThinking(false);
       setIsThinking(false);
-      currentThinkingRef.current = '';
+      if (streamParserRef.current) {
+        streamParserRef.current.reset();
+      }
     }
   };
 
@@ -612,10 +692,9 @@ const NewTab = () => {
                         'text-sm leading-relaxed whitespace-pre-wrap transition-all duration-200',
                         isLight ? 'text-blue-800' : 'text-blue-200'
                       )}>
-                        {isThinking ? currentThinking : (
-                          isThinkingExpanded ? thinkingContent : 
+                        {isThinkingExpanded ? thinkingContent : 
                           (thinkingContent ? `${thinkingContent.slice(0, 100)}${thinkingContent.length > 100 ? '...' : ''}` : '')
-                        )}
+                        }
                       </div>
                     </div>
                   </div>

@@ -16,7 +16,6 @@ interface ChatResponse {
 interface StreamResponse {
   content: string;
   done: boolean;
-  type?: 'thinking' | 'response';  // 新增类型字段
 }
 
 class ApiService {
@@ -117,8 +116,7 @@ class ApiService {
   // 发送流式聊天消息
   async sendMessageStream(
     messages: Message[], 
-    onThinkingChunk: (chunk: string) => void,
-    onResponseChunk: (chunk: string) => void,
+    onChunk: (chunk: string) => void,
     onComplete: () => void,
     onError: (error: Error) => void
   ): Promise<void> {
@@ -159,13 +157,8 @@ class ApiService {
               const streamResponse: StreamResponse = data;
               
               if (streamResponse.content) {
-                // 根据类型调用不同的回调
-                if (streamResponse.type === 'thinking') {
-                  onThinkingChunk(streamResponse.content);
-                } else {
-                  // 默认为 response 类型
-                  onResponseChunk(streamResponse.content);
-                }
+                // 直接传递原始内容，不做任何类型区分
+                onChunk(streamResponse.content);
               }
               
               if (streamResponse.done) {
