@@ -20,6 +20,14 @@ const NewTab = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // 获取问候语
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "早上好";
+    if (hour < 18) return "下午好";
+    return "晚上好";
+  };
+
   // 自动滚动到底部
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -184,6 +192,16 @@ const NewTab = () => {
     }
   };
 
+  // 处理输入框自动调整高度
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputMessage(e.target.value);
+    
+    // 自动调整高度
+    const textarea = e.target;
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+  };
+
   // 清空聊天历史
   const clearChat = async () => {
     try {
@@ -201,10 +219,18 @@ const NewTab = () => {
   // 显示初始化加载状态
   if (isInitializing) {
     return (
-      <div className={cn('min-h-screen flex items-center justify-center', isLight ? 'bg-gray-50' : 'bg-gray-900')}>
+      <div className={cn('min-h-screen flex items-center justify-center', 
+        isLight ? 'bg-white' : 'bg-gray-950')}>
         <div className="text-center">
+          <div className="mb-6">
+            <div className={cn('w-16 h-16 rounded-full mx-auto flex items-center justify-center text-2xl',
+              isLight ? 'bg-orange-100 text-orange-600' : 'bg-orange-500/20 text-orange-400')}>
+              🎓
+            </div>
+          </div>
           <LoadingSpinner size="lg" />
-          <p className={cn('mt-4 text-lg', isLight ? 'text-gray-600' : 'text-gray-400')}>
+          <p className={cn('mt-4 text-lg font-medium', 
+            isLight ? 'text-gray-900' : 'text-gray-100')}>
             正在初始化 Learn Mate...
           </p>
         </div>
@@ -213,171 +239,292 @@ const NewTab = () => {
   }
 
   return (
-    <div className={cn('min-h-screen flex flex-col', isLight ? 'bg-gray-50' : 'bg-gray-900')}>
-      {/* 头部 */}
-      <header className={cn('border-b p-4 flex items-center justify-between', 
-        isLight ? 'bg-white border-gray-200' : 'bg-gray-800 border-gray-700')}>
-        <div className="flex items-center space-x-3">
-          <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center',
-            isLight ? 'bg-blue-100 text-blue-600' : 'bg-blue-600 text-white')}>
-            🎓
-          </div>
-          <div>
-            <h1 className={cn('text-xl font-semibold', isLight ? 'text-gray-900' : 'text-white')}>
-              Learn Mate
-            </h1>
-            <p className={cn('text-sm', isLight ? 'text-gray-500' : 'text-gray-400')}>
-              你的智能学习助手
-            </p>
-          </div>
-        </div>
+    <div className={cn('min-h-screen', isLight ? 'bg-white' : 'bg-gray-950')}>
+      {/* 左侧边栏 */}
+      <div className={cn('fixed left-0 top-0 h-full w-64 border-r flex flex-col',
+        isLight ? 'bg-gray-50 border-gray-200' : 'bg-gray-900 border-gray-800')}>
         
-        <div className="flex items-center space-x-2">
-          {/* 流式响应切换 */}
-          <button
-            onClick={() => setUseStream(!useStream)}
-            className={cn('px-2 py-1 rounded text-xs', 
-              useStream 
-                ? isLight ? 'bg-blue-100 text-blue-600' : 'bg-blue-600 text-white'
-                : isLight ? 'bg-gray-100 text-gray-600' : 'bg-gray-700 text-gray-300'
-            )}
-            title={useStream ? '使用流式响应' : '使用普通响应'}
-          >
-            {useStream ? '流式' : '普通'}
-          </button>
-          
-          {/* 用户状态 */}
-          {user && (
-            <div className={cn('text-xs', isLight ? 'text-gray-500' : 'text-gray-400')}>
-              {user.username.startsWith('temp_') ? '游客模式' : user.username}
+        {/* 顶部标题 */}
+        <div className="p-4 border-b border-inherit">
+          <div className="flex items-center space-x-3">
+            <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center text-lg',
+              isLight ? 'bg-orange-100 text-orange-600' : 'bg-orange-500/20 text-orange-400')}>
+              🎓
             </div>
-          )}
-          
-          {/* 连接状态指示器 */}
-          <div className="flex items-center space-x-1">
-            <div className={cn('w-2 h-2 rounded-full', isConnected ? 'bg-green-500' : 'bg-red-500')} />
-            <span className={cn('text-xs', isLight ? 'text-gray-500' : 'text-gray-400')}>
-              {isConnected ? '已连接' : '未连接'}
-            </span>
+            <div>
+              <h1 className={cn('text-lg font-semibold', 
+                isLight ? 'text-gray-900' : 'text-white')}>
+                Learn Mate
+              </h1>
+            </div>
           </div>
-          
-          <ToggleButton onClick={exampleThemeStorage.toggle} className="p-2">
-            {isLight ? '🌙' : '☀️'}
-          </ToggleButton>
-          
-          <button
-            onClick={clearChat}
-            disabled={isLoading}
-            className={cn('px-3 py-1 rounded text-sm', 
-              isLight ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-gray-700 text-gray-300 hover:bg-gray-600',
-              'disabled:opacity-50 disabled:cursor-not-allowed'
-            )}
-          >
-            清空
-          </button>
-        </div>
-      </header>
-
-      {/* 聊天区域 */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* 消息列表 */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center max-w-md">
-                <div className={cn('w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center',
-                  isLight ? 'bg-blue-100 text-blue-600' : 'bg-blue-600 text-white')}>
-                  🤖
-                </div>
-                <h3 className={cn('text-lg font-medium mb-2', isLight ? 'text-gray-900' : 'text-white')}>
-                  欢迎使用 Learn Mate！
-                </h3>
-                <p className={cn('text-sm', isLight ? 'text-gray-500' : 'text-gray-400')}>
-                  我是你的智能学习助手，可以帮助你学习、解答问题、整理知识点。
-                  <br />
-                  开始对话吧！
-                </p>
-              </div>
-            </div>
-          ) : (
-            messages.map((message, index) => (
-              <div key={index} className={cn('flex', message.role === 'user' ? 'justify-end' : 'justify-start')}>
-                <div className={cn('max-w-xs lg:max-w-md xl:max-w-lg rounded-lg p-3',
-                  message.role === 'user' 
-                    ? isLight ? 'bg-blue-500 text-white' : 'bg-blue-600 text-white'
-                    : isLight ? 'bg-white text-gray-900 border border-gray-200' : 'bg-gray-800 text-white border border-gray-700'
-                )}>
-                  <div className="whitespace-pre-wrap break-words">{message.content}</div>
-                  {message.timestamp && (
-                    <div className={cn('text-xs mt-1 opacity-70')}>
-                      {message.timestamp.toLocaleTimeString()}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-          
-          {/* 加载状态 */}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className={cn('rounded-lg p-3 flex items-center space-x-2',
-                isLight ? 'bg-white border border-gray-200' : 'bg-gray-800 border border-gray-700')}>
-                <LoadingSpinner size="sm" />
-                <span className={cn('text-sm', isLight ? 'text-gray-500' : 'text-gray-400')}>
-                  正在思考...
-                </span>
-              </div>
-            </div>
-          )}
-          
-          <div ref={messagesEndRef} />
         </div>
 
-        {/* 输入区域 */}
-        <div className={cn('border-t p-4', isLight ? 'bg-white border-gray-200' : 'bg-gray-800 border-gray-700')}>
+        {/* 聊天历史占位符 */}
+        <div className="flex-1 p-4">
+          <div className={cn('text-sm', isLight ? 'text-gray-500' : 'text-gray-400')}>
+            聊天记录
+          </div>
+        </div>
+
+        {/* 底部设置 */}
+        <div className="p-4 border-t border-inherit space-y-3">
+          {/* 连接状态 */}
+          <div className="flex items-center justify-between">
+            <span className={cn('text-sm', isLight ? 'text-gray-600' : 'text-gray-300')}>
+              连接状态
+            </span>
+            <div className="flex items-center space-x-1">
+              <div className={cn('w-2 h-2 rounded-full', 
+                isConnected ? 'bg-green-500' : 'bg-red-500')} />
+              <span className={cn('text-xs', isLight ? 'text-gray-500' : 'text-gray-400')}>
+                {isConnected ? '已连接' : '未连接'}
+              </span>
+            </div>
+          </div>
+
+          {/* 用户信息 */}
+          {user && (
+            <div className="flex items-center justify-between">
+              <span className={cn('text-sm', isLight ? 'text-gray-600' : 'text-gray-300')}>
+                用户
+              </span>
+              <span className={cn('text-xs', isLight ? 'text-gray-500' : 'text-gray-400')}>
+                {user.username.startsWith('temp_') ? '游客模式' : user.username}
+              </span>
+            </div>
+          )}
+
+          {/* 功能按钮 */}
           <div className="flex space-x-2">
-            <textarea
-              ref={inputRef}
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder={
-                !isConnected ? "请先启动后端服务..." :
-                !user ? "正在初始化用户..." :
-                isLoading ? "正在思考中..." :
-                "输入你的问题..."
-              }
-              disabled={!isConnected || !user || isLoading}
-              className={cn(
-                'flex-1 resize-none rounded-lg border p-3 focus:outline-none focus:ring-2 focus:ring-blue-500',
-                isLight 
-                  ? 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-500' 
-                  : 'bg-gray-700 border-gray-600 text-white placeholder-gray-400',
-                (!isConnected || isLoading) && 'opacity-50 cursor-not-allowed'
-              )}
-              rows={1}
-              style={{ minHeight: '44px', maxHeight: '120px' }}
-            />
             <button
-              onClick={sendMessage}
-              disabled={!inputMessage.trim() || !isConnected || !user || isLoading}
-              className={cn(
-                'px-4 py-2 rounded-lg font-medium transition-colors',
-                'bg-blue-500 hover:bg-blue-600 text-white',
-                'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-500'
+              onClick={() => setUseStream(!useStream)}
+              className={cn('flex-1 px-2 py-1 rounded text-xs font-medium transition-colors',
+                useStream 
+                  ? isLight ? 'bg-blue-100 text-blue-700' : 'bg-blue-500/20 text-blue-400'
+                  : isLight ? 'bg-gray-100 text-gray-600' : 'bg-gray-800 text-gray-400'
               )}
             >
-              发送
+              {useStream ? '流式' : '普通'}
             </button>
+            
+            <button
+              onClick={clearChat}
+              disabled={isLoading}
+              className={cn('flex-1 px-2 py-1 rounded text-xs font-medium transition-colors',
+                isLight ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-gray-800 text-gray-400 hover:bg-gray-700',
+                'disabled:opacity-50 disabled:cursor-not-allowed'
+              )}
+            >
+              清空
+            </button>
+            
+            <ToggleButton onClick={exampleThemeStorage.toggle} className="p-1">
+              <span className="text-lg">{isLight ? '🌙' : '☀️'}</span>
+            </ToggleButton>
           </div>
-          
-          {!isConnected && (
-            <p className={cn('text-xs mt-2', isLight ? 'text-red-500' : 'text-red-400')}>
-              无法连接到后端服务，请确保后端服务已启动 (http://localhost:8000)
-            </p>
-          )}
         </div>
+      </div>
+
+      {/* 主内容区域 */}
+      <div className="ml-64 flex flex-col min-h-screen">
+        {messages.length === 0 ? (
+          /* 欢迎界面 */
+          <div className="flex-1 flex flex-col items-center justify-center px-8">
+            <div className="max-w-2xl w-full text-center">
+              {/* 问候语 */}
+              <div className="mb-12">
+                <div className={cn('text-2xl mb-2 flex items-center justify-center space-x-2',
+                  isLight ? 'text-gray-900' : 'text-gray-100')}>
+                  <span>🌟</span>
+                  <span className="font-medium">{getGreeting()}, 学习者</span>
+                </div>
+                <p className={cn('text-lg', isLight ? 'text-gray-600' : 'text-gray-400')}>
+                  今天想学点什么？
+                </p>
+              </div>
+
+              {/* 输入框 */}
+              <div className="relative">
+                <textarea
+                  ref={inputRef}
+                  value={inputMessage}
+                  onChange={handleInputChange}
+                  onKeyPress={handleKeyPress}
+                  placeholder={
+                    !isConnected ? "请先启动后端服务..." :
+                    !user ? "正在初始化用户..." :
+                    isLoading ? "正在思考中..." :
+                    "向 Learn Mate 提问..."
+                  }
+                  disabled={!isConnected || !user || isLoading}
+                  className={cn(
+                    'w-full resize-none rounded-2xl border-2 p-4 pr-16 text-lg focus:outline-none transition-all duration-200',
+                    'placeholder:text-gray-400',
+                    isLight 
+                      ? 'bg-white border-gray-200 text-gray-900 focus:border-orange-400 shadow-sm focus:shadow-md' 
+                      : 'bg-gray-900 border-gray-700 text-white focus:border-orange-500',
+                    (!isConnected || isLoading) && 'opacity-50 cursor-not-allowed'
+                  )}
+                  rows={1}
+                  style={{ minHeight: '60px', maxHeight: '160px' }}
+                />
+                
+                {/* 发送按钮 */}
+                <button
+                  onClick={sendMessage}
+                  disabled={!inputMessage.trim() || !isConnected || !user || isLoading}
+                  className={cn(
+                    'absolute right-3 top-1/2 transform -translate-y-1/2',
+                    'w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200',
+                    inputMessage.trim() && isConnected && user && !isLoading
+                      ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-md hover:shadow-lg' 
+                      : isLight ? 'bg-gray-200 text-gray-400' : 'bg-gray-700 text-gray-500',
+                    'disabled:cursor-not-allowed'
+                  )}
+                >
+                  {isLoading ? (
+                    <LoadingSpinner size="sm" />
+                  ) : (
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
+                    </svg>
+                  )}
+                </button>
+              </div>
+
+              {/* 快捷操作提示 */}
+              <div className={cn('mt-6 text-sm flex items-center justify-center space-x-6',
+                isLight ? 'text-gray-500' : 'text-gray-400')}>
+                <div className="flex items-center space-x-1">
+                  <kbd className={cn('px-2 py-1 rounded text-xs',
+                    isLight ? 'bg-gray-100 text-gray-600' : 'bg-gray-800 text-gray-300')}>
+                    Enter
+                  </kbd>
+                  <span>发送</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <kbd className={cn('px-2 py-1 rounded text-xs',
+                    isLight ? 'bg-gray-100 text-gray-600' : 'bg-gray-800 text-gray-300')}>
+                    Shift + Enter
+                  </kbd>
+                  <span>换行</span>
+                </div>
+              </div>
+
+              {!isConnected && (
+                <div className={cn('mt-6 p-4 rounded-lg',
+                  isLight ? 'bg-red-50 text-red-700' : 'bg-red-500/10 text-red-400')}>
+                  <p className="text-sm">
+                    无法连接到后端服务，请确保后端服务已启动 (http://localhost:8000)
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* 聊天界面 */
+          <div className="flex-1 flex flex-col">
+            {/* 消息列表 */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="max-w-4xl mx-auto px-8 py-8 space-y-6">
+                {messages.map((message, index) => (
+                  <div key={index} className={cn('flex', 
+                    message.role === 'user' ? 'justify-end' : 'justify-start')}>
+                    <div className={cn(
+                      'max-w-2xl rounded-2xl px-6 py-4',
+                      message.role === 'user' 
+                        ? isLight 
+                          ? 'bg-orange-500 text-white' 
+                          : 'bg-orange-600 text-white'
+                        : isLight 
+                          ? 'bg-gray-100 text-gray-900' 
+                          : 'bg-gray-800 text-gray-100'
+                    )}>
+                      <div className="whitespace-pre-wrap break-words leading-relaxed">
+                        {message.content}
+                      </div>
+                      {message.timestamp && (
+                        <div className={cn('text-xs mt-2 opacity-70')}>
+                          {message.timestamp.toLocaleTimeString()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                
+                {/* 加载状态 */}
+                {isLoading && (
+                  <div className="flex justify-start">
+                    <div className={cn('rounded-2xl px-6 py-4 flex items-center space-x-3',
+                      isLight ? 'bg-gray-100' : 'bg-gray-800')}>
+                      <LoadingSpinner size="sm" />
+                      <span className={cn('text-sm', 
+                        isLight ? 'text-gray-600' : 'text-gray-300')}>
+                        Learn Mate 正在思考...
+                      </span>
+                    </div>
+                  </div>
+                )}
+                
+                <div ref={messagesEndRef} />
+              </div>
+            </div>
+
+            {/* 底部输入区域 */}
+            <div className="border-t border-inherit">
+              <div className="max-w-4xl mx-auto px-8 py-6">
+                <div className="relative">
+                  <textarea
+                    ref={inputRef}
+                    value={inputMessage}
+                    onChange={handleInputChange}
+                    onKeyPress={handleKeyPress}
+                    placeholder={
+                      !isConnected ? "请先启动后端服务..." :
+                      !user ? "正在初始化用户..." :
+                      isLoading ? "正在思考中..." :
+                      "继续对话..."
+                    }
+                    disabled={!isConnected || !user || isLoading}
+                    className={cn(
+                      'w-full resize-none rounded-2xl border-2 p-4 pr-16 focus:outline-none transition-all duration-200',
+                      'placeholder:text-gray-400',
+                      isLight 
+                        ? 'bg-white border-gray-200 text-gray-900 focus:border-orange-400 shadow-sm focus:shadow-md' 
+                        : 'bg-gray-900 border-gray-700 text-white focus:border-orange-500',
+                      (!isConnected || isLoading) && 'opacity-50 cursor-not-allowed'
+                    )}
+                    rows={1}
+                    style={{ minHeight: '56px', maxHeight: '120px' }}
+                  />
+                  
+                  {/* 发送按钮 */}
+                  <button
+                    onClick={sendMessage}
+                    disabled={!inputMessage.trim() || !isConnected || !user || isLoading}
+                    className={cn(
+                      'absolute right-3 top-1/2 transform -translate-y-1/2',
+                      'w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200',
+                      inputMessage.trim() && isConnected && user && !isLoading
+                        ? 'bg-orange-500 hover:bg-orange-600 text-white' 
+                        : isLight ? 'bg-gray-200 text-gray-400' : 'bg-gray-700 text-gray-500',
+                      'disabled:cursor-not-allowed'
+                    )}
+                  >
+                    {isLoading ? (
+                      <LoadingSpinner size="sm" />
+                    ) : (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
