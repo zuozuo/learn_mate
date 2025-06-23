@@ -9,31 +9,31 @@ h6 {
   color: $myColor;
 }
 
-// 自定义加载动画
-@keyframes thinking-dots {
-  0%, 60%, 100% {
-    transform: translateY(0);
-    opacity: 0.4;
+// 自定义加载动画 - 更柔和的脉冲效果
+@keyframes thinking-pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
   }
-  30% {
-    transform: translateY(-8px);
+  50% {
     opacity: 1;
+    transform: scale(1.1);
   }
 }
 
 .thinking-dot {
-  animation: thinking-dots 1.4s infinite ease-in-out;
+  animation: thinking-pulse 1.5s infinite ease-in-out;
   
   &:nth-child(1) {
     animation-delay: 0ms;
   }
   
   &:nth-child(2) {
-    animation-delay: 160ms;
+    animation-delay: 200ms;
   }
   
   &:nth-child(3) {
-    animation-delay: 320ms;
+    animation-delay: 400ms;
   }
 }
 

@@ -456,30 +456,73 @@ const NewTab = () => {
                 {/* 加载状态 */}
                 {isLoading && (
                   <div className="flex justify-start">
-                    <div className={cn(
-                      'max-w-2xl rounded-2xl px-6 py-4 flex items-center space-x-4',
-                      'loading-message',
-                      isLight 
-                        ? 'bg-gray-100 text-gray-900 border border-gray-200' 
-                        : 'bg-gray-800 text-gray-100 border border-gray-700'
-                    )}>
-                      <div className="flex space-x-1 items-center">
-                        <div className={cn(
-                          'w-2 h-2 rounded-full thinking-dot',
-                          isLight ? 'bg-orange-500' : 'bg-orange-400'
-                        )}></div>
-                        <div className={cn(
-                          'w-2 h-2 rounded-full thinking-dot',
-                          isLight ? 'bg-orange-500' : 'bg-orange-400'
-                        )}></div>
-                        <div className={cn(
-                          'w-2 h-2 rounded-full thinking-dot',
-                          isLight ? 'bg-orange-500' : 'bg-orange-400'
-                        )}></div>
+                    <div className="max-w-2xl w-full">
+                      {/* 思考过程卡片 */}
+                      <div className={cn(
+                        'rounded-xl border px-4 py-3 mb-2 loading-message',
+                        isLight 
+                          ? 'bg-gray-50 border-gray-200 text-gray-700' 
+                          : 'bg-gray-800/50 border-gray-700 text-gray-300'
+                      )}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <div className="flex space-x-1">
+                              <div className={cn(
+                                'w-1.5 h-1.5 rounded-full thinking-dot',
+                                isLight ? 'bg-gray-500' : 'bg-gray-400'
+                              )}></div>
+                              <div className={cn(
+                                'w-1.5 h-1.5 rounded-full thinking-dot',
+                                isLight ? 'bg-gray-500' : 'bg-gray-400'
+                              )}></div>
+                              <div className={cn(
+                                'w-1.5 h-1.5 rounded-full thinking-dot',
+                                isLight ? 'bg-gray-500' : 'bg-gray-400'
+                              )}></div>
+                            </div>
+                            <span className="text-sm font-medium">
+                              正在思考和分析问题
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2 text-xs text-gray-500">
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"/>
+                            </svg>
+                            <span>1s</span>
+                            <svg className="w-3 h-3 transform rotate-180" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd"/>
+                            </svg>
+                          </div>
+                        </div>
                       </div>
-                      <span className="text-sm font-medium">
-                        Learn Mate 正在思考...
-                      </span>
+                      
+                      {/* 实际回复气泡 */}
+                      <div className={cn(
+                        'rounded-2xl px-6 py-4',
+                        isLight 
+                          ? 'bg-gray-100 text-gray-900' 
+                          : 'bg-gray-800 text-gray-100'
+                      )}>
+                        <div className="flex items-center space-x-3">
+                          <div className="flex space-x-1">
+                            <div className={cn(
+                              'w-2 h-2 rounded-full thinking-dot',
+                              isLight ? 'bg-orange-500' : 'bg-orange-400'
+                            )}></div>
+                            <div className={cn(
+                              'w-2 h-2 rounded-full thinking-dot',
+                              isLight ? 'bg-orange-500' : 'bg-orange-400'
+                            )}></div>
+                            <div className={cn(
+                              'w-2 h-2 rounded-full thinking-dot',
+                              isLight ? 'bg-orange-500' : 'bg-orange-400'
+                            )}></div>
+                          </div>
+                          <span className="text-sm">
+                            Learn Mate 正在回复...
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
