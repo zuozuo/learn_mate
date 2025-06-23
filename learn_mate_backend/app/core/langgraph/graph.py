@@ -54,7 +54,10 @@ class LangGraphAgent:
     def __init__(self):
         """Initialize the LangGraph Agent with necessary components."""
         # Use environment-specific LLM model with provider support
-        self.llm = self._create_llm().bind_tools(tools)
+        # NOTE: 不在初始化时绑定工具，避免流式响应问题
+        # 参考: https://github.com/langchain-ai/langchain/issues/26971
+        self.llm = self._create_llm()
+        self.llm_with_tools = self._create_llm().bind_tools(tools)
         self.tools_by_name = {tool.name: tool for tool in tools}
         self._connection_pool: Optional[AsyncConnectionPool] = None
         self._graph: Optional[CompiledStateGraph] = None
@@ -211,7 +214,8 @@ class LangGraphAgent:
         for attempt in range(max_retries):
             try:
                 with llm_inference_duration_seconds.labels(model=self._get_model_name()).time():
-                    generated_state = {"messages": [await self.llm.ainvoke(dump_messages(messages))]}
+                    # 使用带工具的 LLM 进行推理
+                    generated_state = {"messages": [await self.llm_with_tools.ainvoke(dump_messages(messages))]}
                 logger.info(
                     "llm_response_generated",
                     session_id=state.session_id,
