@@ -99,7 +99,7 @@ class ApiService {
 
   // 发送聊天消息
   async sendMessage(messages: Message[]): Promise<ChatResponse> {
-    const response = await fetch(`${this.baseUrl}/api/v1/chat`, {
+    const response = await fetch(`${this.baseUrl}/api/v1/chatbot/chat`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({ messages }),
@@ -121,7 +121,7 @@ class ApiService {
     onError: (error: Error) => void
   ): Promise<void> {
     try {
-      const response = await fetch(`${this.baseUrl}/api/v1/chat/stream`, {
+      const response = await fetch(`${this.baseUrl}/api/v1/chatbot/chat/stream`, {
         method: 'POST',
         headers: this.getHeaders(),
         body: JSON.stringify({ messages }),
@@ -177,7 +177,7 @@ class ApiService {
 
   // 获取聊天历史
   async getChatHistory(): Promise<Message[]> {
-    const response = await fetch(`${this.baseUrl}/api/v1/messages`, {
+    const response = await fetch(`${this.baseUrl}/api/v1/chatbot/messages`, {
       method: 'GET',
       headers: this.getHeaders(),
     });
@@ -212,7 +212,7 @@ class ApiService {
 
   // 清空聊天历史
   async clearChatHistory(): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/api/v1/messages`, {
+    const response = await fetch(`${this.baseUrl}/api/v1/chatbot/messages`, {
       method: 'DELETE',
       headers: this.getHeaders(),
     });
