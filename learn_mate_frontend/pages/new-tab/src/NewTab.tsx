@@ -648,14 +648,18 @@ const NewTab = () => {
                     <div key={index} className={cn("mb-6", isLastMessage && "mb-0")}>
                       {message.role === 'user' ? (
                         /* 用户消息 - 头像在卡片内部 */
-                        <div className="flex justify-end">
+                        <div className="flex justify-start">
                           <div className={cn(
-                            'max-w-2xl rounded-2xl px-4 py-3 flex items-start gap-3',
-                            isLight ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'
+                            'rounded-2xl px-4 py-3 flex items-start gap-3',
+                            isLight 
+                              ? 'bg-gray-100 text-gray-900' 
+                              : 'bg-gray-800 text-gray-100'
                           )}>
                             <div className={cn(
                               'w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5',
-                              isLight ? 'bg-gray-700 text-white' : 'bg-gray-300 text-gray-700'
+                              isLight 
+                                ? 'bg-gray-300 text-gray-700' 
+                                : 'bg-gray-600 text-gray-200'
                             )}>
                               Z
                             </div>
