@@ -17,6 +17,8 @@ const NewTab = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [useStream, setUseStream] = useState(true);
+  const [thinkingContent, setThinkingContent] = useState('');
+  const [isThinking, setIsThinking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -120,19 +122,29 @@ const NewTab = () => {
       if (useStream) {
         // 使用流式响应
         let assistantContent = '';
-        const assistantMessage = { 
-          role: 'assistant' as const, 
-          content: '', 
-          timestamp: new Date() 
-        };
-        
-        // 先添加空的助手消息
-        setMessages(prev => [...prev, assistantMessage]);
+        setThinkingContent('');
+        setIsThinking(true);
         
         await apiService.sendMessageStream(
           allMessages,
-          (chunk: string) => {
-            assistantContent += chunk;
+          // thinking 内容流式更新
+          (thinkingChunk: string) => {
+            setThinkingContent(prev => prev + thinkingChunk);
+          },
+          // response 内容流式更新
+          (responseChunk: string) => {
+            // 如果是第一个 response chunk，说明 thinking 阶段结束
+            if (assistantContent === '') {
+              setIsThinking(false);
+              const assistantMessage = { 
+                role: 'assistant' as const, 
+                content: '', 
+                timestamp: new Date() 
+              };
+              setMessages(prev => [...prev, assistantMessage]);
+            }
+            
+            assistantContent += responseChunk;
             setMessages(prev => {
               const newMessages = [...prev];
               const lastMessage = newMessages[newMessages.length - 1];
@@ -144,18 +156,32 @@ const NewTab = () => {
           },
           () => {
             setIsLoading(false);
+            setIsThinking(false);
+            setThinkingContent('');
           },
           (error: Error) => {
             console.error('Stream error:', error);
+            setIsLoading(false);
+            setIsThinking(false);
+            setThinkingContent('');
+            
+            // 如果还没有添加助手消息，先添加一个
             setMessages(prev => {
               const newMessages = [...prev];
               const lastMessage = newMessages[newMessages.length - 1];
-              if (lastMessage.role === 'assistant' && !lastMessage.content) {
+              
+              if (!lastMessage || lastMessage.role !== 'assistant') {
+                newMessages.push({
+                  role: 'assistant' as const,
+                  content: '抱歉，发生了错误。请稍后重试。',
+                  timestamp: new Date()
+                });
+              } else if (!lastMessage.content) {
                 lastMessage.content = '抱歉，发生了错误。请稍后重试。';
               }
+              
               return newMessages;
             });
-            setIsLoading(false);
           }
         );
       } else {
@@ -484,72 +510,82 @@ const NewTab = () => {
                     
                     {/* 思考和回复内容 */}
                     <div className="flex-1 min-w-0">
-                      {/* 思考过程卡片 */}
-                      <div className={cn(
-                        'rounded-xl border px-4 py-3 mb-3 loading-message',
-                        isLight 
-                          ? 'bg-gray-50 border-gray-200 text-gray-700' 
-                          : 'bg-gray-800/50 border-gray-700 text-gray-300'
-                      )}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <div className="flex space-x-1">
-                              <div className={cn(
-                                'w-1.5 h-1.5 rounded-full thinking-dot',
-                                isLight ? 'bg-gray-500' : 'bg-gray-400'
-                              )}></div>
-                              <div className={cn(
-                                'w-1.5 h-1.5 rounded-full thinking-dot',
-                                isLight ? 'bg-gray-500' : 'bg-gray-400'
-                              )}></div>
-                              <div className={cn(
-                                'w-1.5 h-1.5 rounded-full thinking-dot',
-                                isLight ? 'bg-gray-500' : 'bg-gray-400'
-                              )}></div>
+                      {/* 思考过程卡片 - 显示实时思考内容 */}
+                      {isThinking && (
+                        <div className={cn(
+                          'rounded-xl border px-4 py-3 mb-3 loading-message',
+                          isLight 
+                            ? 'bg-gray-50 border-gray-200 text-gray-700' 
+                            : 'bg-gray-800/50 border-gray-700 text-gray-300'
+                        )}>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <div className="flex space-x-1">
+                                <div className={cn(
+                                  'w-1.5 h-1.5 rounded-full thinking-dot',
+                                  isLight ? 'bg-gray-500' : 'bg-gray-400'
+                                )}></div>
+                                <div className={cn(
+                                  'w-1.5 h-1.5 rounded-full thinking-dot',
+                                  isLight ? 'bg-gray-500' : 'bg-gray-400'
+                                )}></div>
+                                <div className={cn(
+                                  'w-1.5 h-1.5 rounded-full thinking-dot',
+                                  isLight ? 'bg-gray-500' : 'bg-gray-400'
+                                )}></div>
+                              </div>
+                              <span className="text-sm font-medium">
+                                思考过程
+                              </span>
                             </div>
-                            <span className="text-sm font-medium">
-                              正在思考和分析问题
-                            </span>
+                            <div className="flex items-center space-x-2 text-xs text-gray-500">
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"/>
+                              </svg>
+                              <span>1s</span>
+                              <svg className="w-3 h-3 transform rotate-180" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd"/>
+                              </svg>
+                            </div>
                           </div>
-                          <div className="flex items-center space-x-2 text-xs text-gray-500">
-                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"/>
-                            </svg>
-                            <span>1s</span>
-                            <svg className="w-3 h-3 transform rotate-180" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd"/>
-                            </svg>
-                          </div>
+                          {/* 显示实时思考内容 */}
+                          {thinkingContent && (
+                            <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                              {thinkingContent}
+                            </div>
+                          )}
                         </div>
-                      </div>
+                      )}
                       
                       {/* 实际回复气泡 */}
-                      <div className={cn(
-                        'rounded-2xl px-6 py-4',
-                        isLight 
-                          ? 'bg-gray-100 text-gray-900' 
-                          : 'bg-gray-800 text-gray-100'
-                      )}>
-                        <div className="flex items-center space-x-3">
-                          <div className="flex space-x-1">
-                            <div className={cn(
-                              'w-2 h-2 rounded-full thinking-dot',
-                              isLight ? 'bg-orange-500' : 'bg-orange-400'
-                            )}></div>
-                            <div className={cn(
-                              'w-2 h-2 rounded-full thinking-dot',
-                              isLight ? 'bg-orange-500' : 'bg-orange-400'
-                            )}></div>
-                            <div className={cn(
-                              'w-2 h-2 rounded-full thinking-dot',
-                              isLight ? 'bg-orange-500' : 'bg-orange-400'
-                            )}></div>
+                      {(!isThinking && isLoading) && (
+                        <div className={cn(
+                          'rounded-2xl px-6 py-4',
+                          isLight 
+                            ? 'bg-gray-100 text-gray-900' 
+                            : 'bg-gray-800 text-gray-100'
+                        )}>
+                          <div className="flex items-center space-x-3">
+                            <div className="flex space-x-1">
+                              <div className={cn(
+                                'w-2 h-2 rounded-full thinking-dot',
+                                isLight ? 'bg-orange-500' : 'bg-orange-400'
+                              )}></div>
+                              <div className={cn(
+                                'w-2 h-2 rounded-full thinking-dot',
+                                isLight ? 'bg-orange-500' : 'bg-orange-400'
+                              )}></div>
+                              <div className={cn(
+                                'w-2 h-2 rounded-full thinking-dot',
+                                isLight ? 'bg-orange-500' : 'bg-orange-400'
+                              )}></div>
+                            </div>
+                            <span className="text-sm">
+                              Learn Mate 正在回复...
+                            </span>
                           </div>
-                          <span className="text-sm">
-                            Learn Mate 正在回复...
-                          </span>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 )}
