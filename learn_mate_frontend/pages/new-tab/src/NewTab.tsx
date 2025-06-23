@@ -546,14 +546,14 @@ const NewTab = () => {
             <div className="max-w-2xl w-full text-center">
               {/* 问候语 */}
               <div className="mb-12">
-                <div className={cn('text-2xl mb-2 flex items-center justify-center space-x-2',
+                <div className={cn('text-2xl flex items-center justify-center space-x-2',
                   isLight ? 'text-gray-900' : 'text-gray-100')}>
                   <span>🌟</span>
                   <span className="font-medium">{getGreeting()}, 学习者</span>
+                  <span className={cn('text-lg ml-3', isLight ? 'text-gray-600' : 'text-gray-400')}>
+                    今天想学点什么？
+                  </span>
                 </div>
-                <p className={cn('text-lg', isLight ? 'text-gray-600' : 'text-gray-400')}>
-                  今天想学点什么？
-                </p>
               </div>
 
               {/* 输入框 */}
@@ -639,13 +639,13 @@ const NewTab = () => {
           <div className="flex-1 flex flex-col">
             {/* 消息列表 */}
             <div className="flex-1 overflow-y-auto">
-              <div className="max-w-4xl mx-auto px-8 py-8 space-y-8">
+              <div className="max-w-4xl mx-auto px-8 py-8">
                 {messages.map((message, index) => {
                   const isLastMessage = index === messages.length - 1;
                   const isAssistantMessage = message.role === 'assistant';
                   
                   return (
-                    <div key={index} className={cn("mb-6", isLastMessage && "mb-0")}>
+                    <div key={index} className={cn("mb-4", isLastMessage && "mb-0")}>
                       {message.role === 'user' ? (
                         /* 用户消息 - 头像在卡片内部 */
                         <div className="flex justify-start">
