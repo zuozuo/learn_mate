@@ -484,6 +484,26 @@ const NewTab = () => {
                       )}>
                         <div className="whitespace-pre-wrap break-words leading-relaxed">
                           {message.content}
+                          {/* 如果是assistant消息且内容为空且正在加载，显示loading指示器 */}
+                          {message.role === 'assistant' && !message.content && isLoading && (
+                            <div className="flex items-center space-x-2 text-sm opacity-70">
+                              <div className="flex space-x-1">
+                                <div className={cn(
+                                  'w-1.5 h-1.5 rounded-full thinking-dot',
+                                  isLight ? 'bg-orange-500' : 'bg-orange-400'
+                                )}></div>
+                                <div className={cn(
+                                  'w-1.5 h-1.5 rounded-full thinking-dot',
+                                  isLight ? 'bg-orange-500' : 'bg-orange-400'
+                                )}></div>
+                                <div className={cn(
+                                  'w-1.5 h-1.5 rounded-full thinking-dot',
+                                  isLight ? 'bg-orange-500' : 'bg-orange-400'
+                                )}></div>
+                              </div>
+                              <span>正在回复...</span>
+                            </div>
+                          )}
                         </div>
                         {message.timestamp && (
                           <div className={cn('text-xs mt-2 opacity-70')}>
@@ -557,35 +577,6 @@ const NewTab = () => {
                         </div>
                       )}
                       
-                      {/* 实际回复气泡 */}
-                      {(!isThinking && isLoading) && (
-                        <div className={cn(
-                          'rounded-2xl px-6 py-4',
-                          isLight 
-                            ? 'bg-gray-100 text-gray-900' 
-                            : 'bg-gray-800 text-gray-100'
-                        )}>
-                          <div className="flex items-center space-x-3">
-                            <div className="flex space-x-1">
-                              <div className={cn(
-                                'w-2 h-2 rounded-full thinking-dot',
-                                isLight ? 'bg-orange-500' : 'bg-orange-400'
-                              )}></div>
-                              <div className={cn(
-                                'w-2 h-2 rounded-full thinking-dot',
-                                isLight ? 'bg-orange-500' : 'bg-orange-400'
-                              )}></div>
-                              <div className={cn(
-                                'w-2 h-2 rounded-full thinking-dot',
-                                isLight ? 'bg-orange-500' : 'bg-orange-400'
-                              )}></div>
-                            </div>
-                            <span className="text-sm">
-                              Learn Mate 正在回复...
-                            </span>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}
