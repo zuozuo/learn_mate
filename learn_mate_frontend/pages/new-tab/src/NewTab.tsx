@@ -688,8 +688,14 @@ const NewTab = () => {
                               )}>
                                 {isThinkingExpanded ? (
                                   <>
-                                    {/* Header - 只在展开时显示 */}
-                                    <div className="px-4 py-3 flex items-center justify-between animate-fadeIn">
+                                    {/* Header - 只在展开时显示，整个header可点击 */}
+                                    <button
+                                      onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
+                                      className={cn(
+                                        'w-full px-4 py-3 flex items-center justify-between animate-fadeIn',
+                                        'hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors'
+                                      )}
+                                    >
                                       <h3 className={cn(
                                         'text-base font-medium',
                                         isLight ? 'text-gray-900' : 'text-gray-100'
@@ -703,19 +709,11 @@ const NewTab = () => {
                                         )}>
                                           1s
                                         </span>
-                                        <button
-                                          onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
-                                          className={cn(
-                                            'p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors',
-                                            isLight ? 'text-gray-600' : 'text-gray-400'
-                                          )}
-                                        >
-                                          <svg className={cn('w-5 h-5 transition-transform duration-200', isThinkingExpanded && 'rotate-180')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                          </svg>
-                                        </button>
+                                        <svg className={cn('w-5 h-5 transition-transform duration-200', isThinkingExpanded && 'rotate-180')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
                                       </div>
-                                    </div>
+                                    </button>
                                     
                                     {/* Content */}
                                     <div className={cn(
