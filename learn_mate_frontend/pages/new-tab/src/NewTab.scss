@@ -52,3 +52,17 @@ h6 {
 .loading-message {
   animation: fadeInUp 0.3s ease-out;
 }
+
+// 淡入动画
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
