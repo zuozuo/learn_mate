@@ -82,6 +82,7 @@ class LangGraphAgent:
                 api_key=settings.LLM_API_KEY,
                 max_tokens=settings.MAX_TOKENS,
                 base_url=settings.LLM_BASE_URL if settings.LLM_BASE_URL else None,
+                streaming=True,  # 启用流式传输
                 **model_kwargs,
             )
         
@@ -92,6 +93,7 @@ class LangGraphAgent:
                 api_key=settings.OPENROUTER_API_KEY,
                 max_tokens=settings.MAX_TOKENS,
                 base_url=settings.OPENROUTER_BASE_URL,
+                streaming=True,  # 启用流式传输
                 default_headers={
                     "HTTP-Referer": "https://learn-mate.ai",
                     "X-Title": "Learn Mate"
@@ -119,6 +121,7 @@ class LangGraphAgent:
                 temperature=settings.DEFAULT_LLM_TEMPERATURE,
                 api_key=settings.LLM_API_KEY,
                 max_tokens=settings.MAX_TOKENS,
+                streaming=True,  # 启用流式传输
                 **model_kwargs,
             )
 
@@ -385,11 +388,13 @@ class LangGraphAgent:
             self._graph = await self.create_graph()
 
         try:
-            async for token, _ in self._graph.astream(
+            async for msg, metadata in self._graph.astream(
                 {"messages": dump_messages(messages), "session_id": session_id}, config, stream_mode="messages"
             ):
                 try:
-                    yield token.content
+                    # 只处理来自 chat 节点的消息（LLM 输出）
+                    if msg.content and metadata.get("langgraph_node") == "chat":
+                        yield msg.content
                 except Exception as token_error:
                     logger.error("Error processing token", error=str(token_error), session_id=session_id)
                     # Continue with next token even if current one fails

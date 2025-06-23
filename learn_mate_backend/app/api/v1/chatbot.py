@@ -113,19 +113,27 @@ async def chat_stream(
             try:
                 # Get model name based on LLM provider
                 model_name = getattr(agent.llm, 'model_name', None) or getattr(agent.llm, 'model', 'unknown')
+                chunk_count = 0
+                total_content = ""
+                
                 with llm_stream_duration_seconds.labels(model=model_name).time():
                     async for chunk in agent.get_stream_response(
                         chat_request.messages, session.id, user_id=session.user_id
                      ):
+                        chunk_count += 1
+                        total_content += chunk
+                        
                         logger.debug(
-                            "received_chunk",
-                            chunk=repr(chunk),
+                            "streaming_chunk_details",
+                            chunk_number=chunk_count,
+                            chunk_content=repr(chunk[:50]) + "..." if len(chunk) > 50 else repr(chunk),
                             chunk_length=len(chunk),
+                            total_length_so_far=len(total_content),
                             session_id=session.id
                         )
                         
                         # 直接转发原始chunk内容，不做任何解析处理
-                        if chunk.strip():
+                        if chunk:
                             response = StreamResponse(content=chunk, done=False)
                             yield f"data: {json.dumps(response.model_dump())}\n\n"
 
