@@ -220,7 +220,11 @@ class LangGraphAgent:
                     logger.warning(
                         "using_fallback_model", model=fallback_model, environment=settings.ENVIRONMENT.value
                     )
-                    self.llm.model_name = fallback_model
+                    # Update model name based on LLM provider
+                    if hasattr(self.llm, 'model_name'):
+                        self.llm.model_name = fallback_model
+                    elif hasattr(self.llm, 'model'):
+                        self.llm.model = fallback_model
 
                 continue
 
