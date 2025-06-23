@@ -456,11 +456,28 @@ const NewTab = () => {
                 {/* 加载状态 */}
                 {isLoading && (
                   <div className="flex justify-start">
-                    <div className={cn('rounded-2xl px-6 py-4 flex items-center space-x-3',
-                      isLight ? 'bg-gray-100' : 'bg-gray-800')}>
-                      <LoadingSpinner size="sm" />
-                      <span className={cn('text-sm', 
-                        isLight ? 'text-gray-600' : 'text-gray-300')}>
+                    <div className={cn(
+                      'max-w-2xl rounded-2xl px-6 py-4 flex items-center space-x-4',
+                      'loading-message',
+                      isLight 
+                        ? 'bg-gray-100 text-gray-900 border border-gray-200' 
+                        : 'bg-gray-800 text-gray-100 border border-gray-700'
+                    )}>
+                      <div className="flex space-x-1 items-center">
+                        <div className={cn(
+                          'w-2 h-2 rounded-full thinking-dot',
+                          isLight ? 'bg-orange-500' : 'bg-orange-400'
+                        )}></div>
+                        <div className={cn(
+                          'w-2 h-2 rounded-full thinking-dot',
+                          isLight ? 'bg-orange-500' : 'bg-orange-400'
+                        )}></div>
+                        <div className={cn(
+                          'w-2 h-2 rounded-full thinking-dot',
+                          isLight ? 'bg-orange-500' : 'bg-orange-400'
+                        )}></div>
+                      </div>
+                      <span className="text-sm font-medium">
                         Learn Mate 正在思考...
                       </span>
                     </div>
