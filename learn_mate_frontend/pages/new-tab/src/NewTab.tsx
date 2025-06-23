@@ -663,7 +663,7 @@ const NewTab = () => {
                             )}>
                               Z
                             </div>
-                            <div className="whitespace-pre-wrap break-words leading-relaxed">
+                            <div className="whitespace-pre-wrap break-words leading-relaxed text-base">
                               {message.content}
                             </div>
                           </div>
@@ -705,7 +705,7 @@ const NewTab = () => {
                           {/* Response内容 */}
                           <div className="max-w-4xl">
                             <div className={cn(
-                              'text-sm leading-relaxed',
+                              'text-base leading-relaxed',
                               isLight ? 'text-gray-900' : 'text-gray-100'
                             )}>
                               {message.content || (
