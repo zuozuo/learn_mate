@@ -834,7 +834,7 @@ const NewTab = () => {
                                   'text-xs ml-auto',
                                   isLight ? 'text-gray-400' : 'text-gray-500'
                                 )}>
-                                  Claude can make mistakes. Please double-check responses.
+                                  AI can make mistakes. Please double-check responses.
                                 </span>
                               </div>
                             )}
