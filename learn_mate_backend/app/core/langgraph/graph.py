@@ -16,7 +16,6 @@ from langchain_core.messages import (
 )
 from langchain_openai import ChatOpenAI
 from langchain_ollama import ChatOllama
-from langfuse.langchain import CallbackHandler
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import (
     END,
@@ -341,12 +340,6 @@ class LangGraphAgent:
             self._graph = await self.create_graph()
         config = {
             "configurable": {"thread_id": session_id},
-            "callbacks": [
-                CallbackHandler(
-                    user_id=user_id,
-                    session_id=session_id,
-                )
-            ],
         }
         try:
             response = await self._graph.ainvoke(
@@ -372,12 +365,6 @@ class LangGraphAgent:
         """
         config = {
             "configurable": {"thread_id": session_id},
-            "callbacks": [
-                CallbackHandler(
-                    user_id=user_id,
-                    session_id=session_id,
-                )
-            ],
         }
         if self._graph is None:
             self._graph = await self.create_graph()
