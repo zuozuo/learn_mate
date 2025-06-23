@@ -76,11 +76,13 @@ class StreamParser {
       console.log(`🔄 Switched to response mode, buffer cleared`);
     } else if (this.isInThinking) {
       // We're in thinking mode but haven't found closing tag yet
-      // All content goes to thinking
-      this.thinkingContent += this.buffer;
-      result.thinking = this.buffer;
-      this.buffer = '';
-      console.log(`🧠 Adding to thinking (no end tag yet):`, JSON.stringify(result.thinking));
+      // Output the buffered content as thinking
+      if (this.buffer) {
+        this.thinkingContent += this.buffer;
+        result.thinking = this.buffer;
+        this.buffer = '';
+        console.log(`🧠 In thinking mode, outputting content:`, JSON.stringify(result.thinking));
+      }
     } else {
       // We're in response mode
       this.responseContent += this.buffer;
