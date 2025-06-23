@@ -19,14 +19,26 @@ class StreamParser {
   // Process a new chunk and return the thinking and response parts
   processChunk(chunk: string): { thinking: string; response: string; thinkingComplete: boolean } {
     this.chunkCount++;
+    
+    // 处理JSON编码的字符串（如果chunk被JSON编码了）
+    let processedChunk = chunk;
+    if (chunk.startsWith('"') && chunk.endsWith('"')) {
+      try {
+        processedChunk = JSON.parse(chunk);
+      } catch (e) {
+        // 如果解析失败，保持原样
+      }
+    }
+    
     console.log(`🔄 StreamParser chunk #${this.chunkCount}:`, {
       incoming: JSON.stringify(chunk),
+      processed: JSON.stringify(processedChunk),
       bufferBefore: JSON.stringify(this.buffer),
       isInThinking: this.isInThinking,
-      chunkLength: chunk.length
+      chunkLength: processedChunk.length
     });
 
-    this.buffer += chunk;
+    this.buffer += processedChunk;
     let result = { thinking: '', response: '', thinkingComplete: false };
 
     // Check for <think> start tag
@@ -293,6 +305,12 @@ const NewTab = () => {
                 setIsThinking(true);
               }
               setThinkingContent(prev => {
+                // 如果是第一次添加内容，去除开头的空白
+                if (!prev && parsed.thinking) {
+                  const trimmed = parsed.thinking.trimStart();
+                  console.log(`🧠 UI: First thinking content (trimmed): ${trimmed.length} chars`);
+                  return trimmed;
+                }
                 const newContent = prev + parsed.thinking;
                 console.log(`🧠 UI: Updated thinking content length: ${newContent.length}`);
                 return newContent;
@@ -318,9 +336,16 @@ const NewTab = () => {
                 const newMessages = [...prev];
                 const lastMessage = newMessages[newMessages.length - 1];
                 if (lastMessage.role === 'assistant') {
-                  const newContent = lastMessage.content + parsed.response;
-                  console.log(`💬 UI: Updated response content length: ${newContent.length}`);
-                  lastMessage.content = newContent;
+                  // 如果是第一次添加response内容，去除开头的空白
+                  if (!lastMessage.content && parsed.response) {
+                    const trimmed = parsed.response.trimStart();
+                    console.log(`💬 UI: First response content (trimmed): ${trimmed.length} chars`);
+                    lastMessage.content = trimmed;
+                  } else {
+                    const newContent = lastMessage.content + parsed.response;
+                    console.log(`💬 UI: Updated response content length: ${newContent.length}`);
+                    lastMessage.content = newContent;
+                  }
                 }
                 return newMessages;
               });
@@ -402,14 +427,22 @@ const NewTab = () => {
       return null;
     }
     
-    // 首先去除开头和结尾的空白
-    const trimmedContent = content.trim();
+    // 首先去除开头和结尾的空白，包括换行符
+    let trimmedContent = content.trim();
+    
+    // 特殊处理：如果内容以多个换行符开始，去除它们
+    trimmedContent = trimmedContent.replace(/^[\n\r]+/, '').replace(/[\n\r]+$/, '');
+    
+    // 如果处理后内容为空，返回null
+    if (!trimmedContent) {
+      return null;
+    }
     
     // 将文本分割为段落
     const paragraphs = trimmedContent.split(/\n{2,}/); // 两个或更多换行符分割段落
     
     // 调试：打印段落信息
-    console.log(`Formatting content, paragraphs count: ${paragraphs.length}`, paragraphs);
+    console.log(`Formatting content, trimmed: "${trimmedContent}", paragraphs count: ${paragraphs.length}`);
     
     const elements = paragraphs.map((paragraph, index) => {
       // 跳过空段落
@@ -446,6 +479,11 @@ const NewTab = () => {
       
       return null;
     }).filter(Boolean);
+    
+    // 如果没有有效内容，返回null
+    if (elements.length === 0) {
+      return null;
+    }
     
     // 如果只有一个段落，不需要额外的margin
     if (elements.length === 1) {
@@ -922,7 +960,13 @@ const NewTab = () => {
                                           const parsed = streamParserRef.current!.processChunk(chunk);
                                           
                                           if (parsed.thinking) {
-                                            setThinkingContent(prev => prev + parsed.thinking);
+                                            setThinkingContent(prev => {
+                                              // 如果是第一次添加内容，去除开头的空白
+                                              if (!prev && parsed.thinking) {
+                                                return parsed.thinking.trimStart();
+                                              }
+                                              return prev + parsed.thinking;
+                                            });
                                           }
                                           
                                           if (parsed.thinkingComplete) {
@@ -937,7 +981,12 @@ const NewTab = () => {
                                               const newMessages = [...prev];
                                               const lastMessage = newMessages[newMessages.length - 1];
                                               if (lastMessage.role === 'assistant') {
-                                                lastMessage.content = lastMessage.content + parsed.response;
+                                                // 如果是第一次添加response内容，去除开头的空白
+                                                if (!lastMessage.content && parsed.response) {
+                                                  lastMessage.content = parsed.response.trimStart();
+                                                } else {
+                                                  lastMessage.content = lastMessage.content + parsed.response;
+                                                }
                                               }
                                               return newMessages;
                                             });
