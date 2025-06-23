@@ -82,7 +82,7 @@ class AuthService {
   async createTemporarySession(): Promise<User> {
     // 生成临时用户ID和邮箱
     const tempUserId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const tempEmail = `${tempUserId}@temp.local`;
+    const tempEmail = `${tempUserId}@example.com`;
     // 创建一个满足密码强度要求的临时密码
     const tempPassword = `TempPass123!${Math.random().toString(36).substr(2, 4)}`;
     const tempUser: User = { username: tempUserId, email: tempEmail };
