@@ -721,6 +721,9 @@ const NewTab = () => {
                                       isLight ? 'text-gray-700' : 'text-gray-300'
                                     )}>
                                       {thinkingContent}
+                                      {isThinking && (
+                                        <span className="inline-block w-2 h-4 bg-current animate-pulse ml-0.5" />
+                                      )}
                                     </div>
                                   </>
                                 ) : (
