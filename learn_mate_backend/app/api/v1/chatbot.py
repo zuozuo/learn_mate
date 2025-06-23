@@ -124,6 +124,12 @@ async def chat_stream(
                         chat_request.messages, session.id, user_id=session.user_id
                      ):
                         full_response += chunk
+                        logger.debug(
+                            "received_chunk",
+                            chunk=repr(chunk),
+                            chunk_length=len(chunk),
+                            session_id=session.id
+                        )
                         
                         # 解析 thinking 标签
                         if "<think>" in chunk and not in_thinking:
@@ -176,6 +182,17 @@ async def chat_stream(
                                 session_id=session.id
                             )
                             yield f"data: {json.dumps(response.model_dump())}\n\n"
+
+                # 如果没有发送任何response内容，将完整内容作为response发送
+                if not response_content and not thinking_sent:
+                    logger.info(
+                        "no_thinking_tags_detected_sending_full_response",
+                        session_id=session.id,
+                        full_response_length=len(full_response)
+                    )
+                    if full_response.strip():
+                        response = StreamResponse(content=full_response, done=False, type="response")
+                        yield f"data: {json.dumps(response.model_dump())}\n\n"
 
                 # Send final message indicating completion
                 final_response = StreamResponse(content="", done=True)
