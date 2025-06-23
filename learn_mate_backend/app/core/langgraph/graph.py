@@ -142,6 +142,21 @@ class LangGraphAgent:
 
         return model_kwargs
 
+    def _get_model_name(self) -> str:
+        """Get model name from LLM instance, compatible with different providers.
+        
+        Returns:
+            str: The model name for metrics and logging
+        """
+        # Try different attribute names based on LLM provider
+        if hasattr(self.llm, 'model_name'):
+            return self.llm.model_name
+        elif hasattr(self.llm, 'model'):
+            return self.llm.model
+        else:
+            # Fallback to configured model name
+            return settings.LLM_MODEL
+
     async def _get_connection_pool(self) -> AsyncConnectionPool:
         """Get a PostgreSQL connection pool using environment-specific settings.
 
@@ -192,7 +207,7 @@ class LangGraphAgent:
 
         for attempt in range(max_retries):
             try:
-                with llm_inference_duration_seconds.labels(model=self.llm.model_name).time():
+                with llm_inference_duration_seconds.labels(model=self._get_model_name()).time():
                     generated_state = {"messages": [await self.llm.ainvoke(dump_messages(messages))]}
                 logger.info(
                     "llm_response_generated",
