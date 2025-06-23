@@ -129,11 +129,11 @@ async def chat_stream(
                         if "<think>" in chunk and not in_thinking:
                             in_thinking = True
                             # 发送 thinking 开始前的内容（如果有）
-                            if "<think>" not in chunk.split("<think>")[0]:
-                                content_before = chunk.split("<think>")[0]
-                                if content_before.strip():
-                                    response = StreamResponse(content=content_before, done=False, type="response")
-                                    yield f"data: {json.dumps(response.model_dump())}\n\n"
+                            content_before = chunk.split("<think>")[0]
+                            if content_before.strip():
+                                response = StreamResponse(content=content_before, done=False, type="response")
+                                yield f"data: {json.dumps(response.model_dump())}\n\n"
+                            
                             # 开始发送 thinking 内容
                             thinking_part = chunk.split("<think>", 1)[-1]
                             if thinking_part:
@@ -168,6 +168,13 @@ async def chat_stream(
                             # 普通回复内容
                             response_content += chunk
                             response = StreamResponse(content=chunk, done=False, type="response")
+                            logger.debug(
+                                "streaming_response_chunk",
+                                chunk_type="response", 
+                                chunk_length=len(chunk),
+                                in_thinking=in_thinking,
+                                session_id=session.id
+                            )
                             yield f"data: {json.dumps(response.model_dump())}\n\n"
 
                 # Send final message indicating completion
