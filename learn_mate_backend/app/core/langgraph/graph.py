@@ -387,51 +387,20 @@ class LangGraphAgent:
         if self._graph is None:
             self._graph = await self.create_graph()
 
-        token_count = 0
-        accumulated_content = ""
-        
         try:
-            # Use astream_events for token-level streaming
-            async for event in self._graph.astream_events(
-                {"messages": dump_messages(messages), "session_id": session_id}, 
-                config, 
-                version="v2"
+            async for msg, metadata in self._graph.astream(
+                {"messages": dump_messages(messages), "session_id": session_id}, config, stream_mode="messages"
             ):
-                # Only process LLM streaming events
-                if event["event"] == "on_chat_model_stream":
-                    # Only process events from the chat node
-                    metadata = event.get("metadata", {})
-                    if metadata.get("langgraph_node") == "chat":
-                        chunk = event.get("data", {}).get("chunk", None)
-                        if chunk and hasattr(chunk, "content") and chunk.content:
-                            token_count += 1
-                            content = chunk.content
-                            accumulated_content += content
-                            
-                            logger.debug(
-                                "streaming_token",
-                                session_id=session_id,
-                                token_number=token_count,
-                                token_length=len(content),
-                                accumulated_length=len(accumulated_content)
-                            )
-                            
-                            yield content
-                            
-            logger.info(
-                "streaming_completed",
-                session_id=session_id,
-                total_tokens=token_count,
-                total_content_length=len(accumulated_content)
-            )
-                            
+                try:
+                    # 只处理来自 chat 节点的消息（LLM 输出）
+                    if msg.content and metadata.get("langgraph_node") == "chat":
+                        yield msg.content
+                except Exception as token_error:
+                    logger.error("Error processing token", error=str(token_error), session_id=session_id)
+                    # Continue with next token even if current one fails
+                    continue
         except Exception as stream_error:
-            logger.error(
-                "stream_processing_error", 
-                error=str(stream_error), 
-                session_id=session_id,
-                tokens_before_error=token_count
-            )
+            logger.error("Error in stream processing", error=str(stream_error), session_id=session_id)
             raise stream_error
 
     async def get_chat_history(self, session_id: str) -> list[Message]:
