@@ -14,33 +14,52 @@ class StreamParser {
   private isInThinking: boolean = false;
   private thinkingContent: string = '';
   private responseContent: string = '';
+  private chunkCount: number = 0;
 
   // Process a new chunk and return the thinking and response parts
   processChunk(chunk: string): { thinking: string; response: string; thinkingComplete: boolean } {
+    this.chunkCount++;
+    console.log(`🔄 StreamParser chunk #${this.chunkCount}:`, {
+      incoming: JSON.stringify(chunk),
+      bufferBefore: JSON.stringify(this.buffer),
+      isInThinking: this.isInThinking,
+      chunkLength: chunk.length
+    });
+
     this.buffer += chunk;
     let result = { thinking: '', response: '', thinkingComplete: false };
 
     // Check for <think> start tag
     if (!this.isInThinking && this.buffer.includes('<think>')) {
+      console.log(`🧠 Found <think> tag start in chunk #${this.chunkCount}`);
       const parts = this.buffer.split('<think>');
+      console.log(`📋 Split by <think>:`, parts.map(p => JSON.stringify(p)));
+      
       // Content before <think> goes to response
       if (parts[0]) {
         this.responseContent += parts[0];
         result.response = parts[0];
+        console.log(`💬 Response content before thinking:`, JSON.stringify(parts[0]));
       }
       
       // Start thinking mode
       this.isInThinking = true;
       this.buffer = parts.slice(1).join('<think>'); // Keep everything after first <think>
+      console.log(`🔄 Switched to thinking mode, new buffer:`, JSON.stringify(this.buffer));
     }
 
     // Check for </think> end tag
     if (this.isInThinking && this.buffer.includes('</think>')) {
+      console.log(`🧠 Found </think> tag end in chunk #${this.chunkCount}`);
       const parts = this.buffer.split('</think>');
+      console.log(`📋 Split by </think>:`, parts.map(p => JSON.stringify(p)));
+      
       // Content before </think> goes to thinking
       this.thinkingContent += parts[0];
       result.thinking = parts[0];
       result.thinkingComplete = true;
+      console.log(`🧠 Thinking content:`, JSON.stringify(parts[0]));
+      console.log(`✅ Thinking phase completed`);
       
       // End thinking mode
       this.isInThinking = false;
@@ -50,39 +69,65 @@ class StreamParser {
       if (afterThinking) {
         this.responseContent += afterThinking;
         result.response = (result.response || '') + afterThinking;
+        console.log(`💬 Response content after thinking:`, JSON.stringify(afterThinking));
       }
       
       this.buffer = '';
+      console.log(`🔄 Switched to response mode, buffer cleared`);
     } else if (this.isInThinking) {
       // We're in thinking mode but haven't found closing tag yet
       // All content goes to thinking
       this.thinkingContent += this.buffer;
       result.thinking = this.buffer;
       this.buffer = '';
+      console.log(`🧠 Adding to thinking (no end tag yet):`, JSON.stringify(result.thinking));
     } else {
       // We're in response mode
       this.responseContent += this.buffer;
       result.response = (result.response || '') + this.buffer;
       this.buffer = '';
+      console.log(`💬 Adding to response:`, JSON.stringify(result.response));
     }
+
+    console.log(`📊 Chunk #${this.chunkCount} result:`, {
+      thinking: JSON.stringify(result.thinking),
+      response: JSON.stringify(result.response),
+      thinkingComplete: result.thinkingComplete,
+      totalThinking: this.thinkingContent.length,
+      totalResponse: this.responseContent.length
+    });
 
     return result;
   }
 
   // Get the accumulated content
   getContent(): { thinking: string; response: string } {
-    return {
+    const content = {
       thinking: this.thinkingContent,
       response: this.responseContent
     };
+    console.log(`📈 Total accumulated content:`, {
+      thinkingLength: content.thinking.length,
+      responseLength: content.response.length,
+      thinking: content.thinking.slice(0, 100) + (content.thinking.length > 100 ? '...' : ''),
+      response: content.response.slice(0, 100) + (content.response.length > 100 ? '...' : '')
+    });
+    return content;
   }
 
   // Reset the parser
   reset(): void {
+    console.log(`🔄 StreamParser reset - previous stats:`, {
+      totalChunks: this.chunkCount,
+      finalThinkingLength: this.thinkingContent.length,
+      finalResponseLength: this.responseContent.length
+    });
+    
     this.buffer = '';
     this.isInThinking = false;
     this.thinkingContent = '';
     this.responseContent = '';
+    this.chunkCount = 0;
   }
 }
 
@@ -214,26 +259,36 @@ const NewTab = () => {
           allMessages,
           // 统一的chunk处理函数
           (chunk: string) => {
+            console.log(`🔥 Received raw chunk from API:`, JSON.stringify(chunk));
             const parsed = streamParserRef.current!.processChunk(chunk);
             
             // 处理thinking内容
             if (parsed.thinking) {
+              console.log(`🧠 UI: Processing thinking content:`, JSON.stringify(parsed.thinking));
               if (!showThinking) {
+                console.log(`👁️ UI: Showing thinking panel for first time`);
                 setShowThinking(true);
                 setIsThinking(true);
               }
-              setThinkingContent(prev => prev + parsed.thinking);
+              setThinkingContent(prev => {
+                const newContent = prev + parsed.thinking;
+                console.log(`🧠 UI: Updated thinking content length: ${newContent.length}`);
+                return newContent;
+              });
             }
             
             // thinking完成时停止thinking状态
             if (parsed.thinkingComplete) {
+              console.log(`✅ UI: Thinking phase completed, switching to response mode`);
               setIsThinking(false);
             }
             
             // 处理response内容
             if (parsed.response) {
+              console.log(`💬 UI: Processing response content:`, JSON.stringify(parsed.response));
               // 如果还没有添加assistant消息，添加一个
               if (!assistantMessageAdded) {
+                console.log(`➕ UI: Adding first assistant message`);
                 assistantMessageAdded = true;
                 const assistantMessage = { 
                   role: 'assistant' as const, 
@@ -242,12 +297,15 @@ const NewTab = () => {
                 };
                 setMessages(prev => [...prev, assistantMessage]);
               } else {
+                console.log(`🔄 UI: Updating existing assistant message`);
                 // 更新现有的assistant消息
                 setMessages(prev => {
                   const newMessages = [...prev];
                   const lastMessage = newMessages[newMessages.length - 1];
                   if (lastMessage.role === 'assistant') {
-                    lastMessage.content += parsed.response;
+                    const newContent = lastMessage.content + parsed.response;
+                    console.log(`💬 UI: Updated response content length: ${newContent.length}`);
+                    lastMessage.content = newContent;
                   }
                   return newMessages;
                 });
@@ -255,22 +313,36 @@ const NewTab = () => {
             }
           },
           () => {
+            console.log(`✅ Stream completed successfully`);
+            const finalContent = streamParserRef.current?.getContent();
+            console.log(`📊 Final stream statistics:`, {
+              thinkingLength: finalContent?.thinking.length || 0,
+              responseLength: finalContent?.response.length || 0,
+              assistantMessageAdded
+            });
             setIsLoading(false);
             setIsThinking(false);
           },
           (error: Error) => {
-            console.error('Stream error:', error);
+            console.error('❌ Stream error:', error);
+            console.log(`📊 Error state statistics:`, {
+              assistantMessageAdded,
+              currentThinkingLength: thinkingContent.length,
+              parseState: streamParserRef.current ? 'exists' : 'null'
+            });
             setIsLoading(false);
             setIsThinking(false);
             
             // 如果还没有添加助手消息，先添加一个错误消息
             if (!assistantMessageAdded) {
+              console.log(`➕ Adding error message (no assistant message yet)`);
               setMessages(prev => [...prev, {
                 role: 'assistant' as const,
                 content: '抱歉，发生了错误。请稍后重试。',
                 timestamp: new Date()
               }]);
             } else {
+              console.log(`🔄 Updating existing message with error`);
               // 更新现有消息为错误状态
               setMessages(prev => {
                 const newMessages = [...prev];
