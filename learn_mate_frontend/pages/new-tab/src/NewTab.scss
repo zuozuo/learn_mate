@@ -78,6 +78,11 @@ h6 {
     }
   }
   
+  // 单段落情况下不需要margin
+  .single-paragraph p {
+    margin-bottom: 0;
+  }
+  
   // 代码块样式
   pre {
     background-color: #f6f8fa;

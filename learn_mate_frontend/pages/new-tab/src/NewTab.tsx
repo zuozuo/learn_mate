@@ -397,10 +397,26 @@ const NewTab = () => {
 
   // 格式化内容，处理段落和代码块
   const formatContent = (content: string): React.ReactNode => {
-    // 将文本分割为段落
-    const paragraphs = content.split(/\n{2,}/); // 两个或更多换行符分割段落
+    // 如果内容为空或只有空白字符，返回null
+    if (!content || !content.trim()) {
+      return null;
+    }
     
-    return paragraphs.map((paragraph, index) => {
+    // 首先去除开头和结尾的空白
+    const trimmedContent = content.trim();
+    
+    // 将文本分割为段落
+    const paragraphs = trimmedContent.split(/\n{2,}/); // 两个或更多换行符分割段落
+    
+    // 调试：打印段落信息
+    console.log(`Formatting content, paragraphs count: ${paragraphs.length}`, paragraphs);
+    
+    const elements = paragraphs.map((paragraph, index) => {
+      // 跳过空段落
+      if (!paragraph.trim()) {
+        return null;
+      }
+      
       // 检查是否是代码块
       if (paragraph.startsWith('```')) {
         const lines = paragraph.split('\n');
@@ -408,7 +424,7 @@ const NewTab = () => {
         const code = lines.slice(1, -1).join('\n');
         
         return (
-          <pre key={index} className="mb-3 last:mb-0">
+          <pre key={index} className="mb-2 last:mb-0">
             <code className={language ? `language-${language}` : ''}>
               {code}
             </code>
@@ -422,7 +438,7 @@ const NewTab = () => {
       
       if (cleanedParagraph) {
         return (
-          <p key={index} className="mb-3 last:mb-0">
+          <p key={index} className="mb-2 last:mb-0">
             {cleanedParagraph}
           </p>
         );
@@ -430,6 +446,13 @@ const NewTab = () => {
       
       return null;
     }).filter(Boolean);
+    
+    // 如果只有一个段落，不需要额外的margin
+    if (elements.length === 1) {
+      return <div className="single-paragraph">{elements}</div>;
+    }
+    
+    return elements;
   };
 
   // 处理键盘事件
@@ -721,11 +744,11 @@ const NewTab = () => {
                         </div>
                       ) : (
                         /* Assistant消息 - 无头像，简化设计 */
-                        <div className="space-y-2">
+                        <div>
                           {/* Thinking 卡片 - 在response上方 */}
                           {isLastMessage && thinkingContent && (
                             <div className={cn(
-                              'rounded-lg border overflow-hidden transition-all duration-200',
+                              'rounded-lg border overflow-hidden transition-all duration-200 mb-2',
                               isLight 
                                 ? 'bg-gray-50 border-gray-200' 
                                 : 'bg-gray-800 border-gray-700'
@@ -740,7 +763,7 @@ const NewTab = () => {
                                     <button
                                       onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
                                       className={cn(
-                                        'w-full px-4 pt-3 pb-2 flex items-center justify-between animate-fadeIn',
+                                        'w-full px-4 py-2 flex items-center justify-between animate-fadeIn',
                                         'hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors'
                                       )}
                                     >
@@ -765,7 +788,7 @@ const NewTab = () => {
                                     
                                     {/* Content */}
                                     <div className={cn(
-                                      'px-4 pt-1 pb-4 text-sm leading-relaxed animate-fadeIn thinking-content',
+                                      'px-4 pb-3 text-sm leading-relaxed animate-fadeIn thinking-content',
                                       isLight ? 'text-gray-700' : 'text-gray-300 dark'
                                     )}>
                                       {formatContent(thinkingContent)}
