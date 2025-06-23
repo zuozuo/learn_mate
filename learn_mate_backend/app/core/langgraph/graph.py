@@ -385,24 +385,75 @@ class LangGraphAgent:
         Yields:
             str: Tokens of the LLM response.
         """
-        config = {
-            "configurable": {"thread_id": session_id},
-        }
-        if self._graph is None:
-            self._graph = await self.create_graph()
-
+        # 直接使用不带工具的 LLM 进行流式响应，避免 bind_tools 导致的流式失效
+        # 参考: https://github.com/langchain-ai/langchain/issues/26971
+        from app.core.prompts import SYSTEM_PROMPT
+        from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+        
         try:
-            async for msg, metadata in self._graph.astream(
-                {"messages": dump_messages(messages), "session_id": session_id}, config, stream_mode="messages"
-            ):
+            # 转换消息格式
+            langchain_messages = [SystemMessage(content=SYSTEM_PROMPT)]
+            for msg in messages:
+                if msg.role == "user":
+                    langchain_messages.append(HumanMessage(content=msg.content))
+                elif msg.role == "assistant":
+                    langchain_messages.append(AIMessage(content=msg.content))
+            
+            token_count = 0
+            accumulated_content = ""
+            
+            # 使用不带工具的 LLM 直接流式
+            async for chunk in self.llm.astream(langchain_messages):
+                if chunk.content:
+                    token_count += 1
+                    content = chunk.content
+                    accumulated_content += content
+                    
+                    logger.debug(
+                        "streaming_token",
+                        session_id=session_id,
+                        token_number=token_count,
+                        token_length=len(content),
+                        accumulated_length=len(accumulated_content)
+                    )
+                    
+                    yield content
+            
+            # 流式完成后，保存到历史记录
+            if accumulated_content and self._graph:
                 try:
-                    # 只处理来自 chat 节点的消息（LLM 输出）
-                    if msg.content and metadata.get("langgraph_node") == "chat":
-                        yield msg.content
-                except Exception as token_error:
-                    logger.error("Error processing token", error=str(token_error), session_id=session_id)
-                    # Continue with next token even if current one fails
-                    continue
+                    # 将完整的对话保存到 LangGraph 历史
+                    complete_messages = messages + [
+                        Message(role="assistant", content=accumulated_content)
+                    ]
+                    config = {"configurable": {"thread_id": session_id}}
+                    
+                    # 使用 invoke（非流式）来保存历史，这会通过 _chat 方法
+                    await self._graph.ainvoke(
+                        {"messages": dump_messages(complete_messages), "session_id": session_id},
+                        config
+                    )
+                    
+                    logger.info(
+                        "streaming_history_saved",
+                        session_id=session_id,
+                        content_length=len(accumulated_content)
+                    )
+                except Exception as e:
+                    logger.error(
+                        "streaming_history_save_failed",
+                        session_id=session_id,
+                        error=str(e)
+                    )
+                    # 历史保存失败不影响流式响应
+            
+            logger.info(
+                "streaming_completed",
+                session_id=session_id,
+                total_tokens=token_count,
+                total_content_length=len(accumulated_content)
+            )
+            
         except Exception as stream_error:
             logger.error("Error in stream processing", error=str(stream_error), session_id=session_id)
             raise stream_error
