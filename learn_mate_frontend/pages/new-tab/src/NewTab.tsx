@@ -145,7 +145,7 @@ const NewTab = () => {
   const [thinkingContent, setThinkingContent] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [showThinking, setShowThinking] = useState(false);
-  const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
+  const [isThinkingExpanded, setIsThinkingExpanded] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const streamParserRef = useRef<StreamParser | null>(null);
@@ -243,6 +243,14 @@ const NewTab = () => {
     setInputMessage('');
     setIsLoading(true);
 
+    // 立即添加一个空的assistant消息，准备接收流式内容
+    const emptyAssistantMessage = {
+      role: 'assistant' as const,
+      content: '',
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, emptyAssistantMessage]);
+
     try {
       // 准备发送的消息列表（包含历史消息）
       const allMessages = [...messages, userMessage];
@@ -250,12 +258,13 @@ const NewTab = () => {
       if (useStream) {
         // 使用流式响应
         streamParserRef.current = new StreamParser();
-        let assistantMessageAdded = false;
+        let assistantMessageAdded = true; // 已经添加了空消息
         
-        // 重置状态
+        // 重置状态并立即显示thinking
         setThinkingContent('');
-        setShowThinking(false);
-        setIsThinking(false);
+        setShowThinking(true);
+        setIsThinking(true);
+        setIsThinkingExpanded(true); // 默认展开
         
         await apiService.sendMessageStream(
           allMessages,
@@ -279,39 +288,31 @@ const NewTab = () => {
               });
             }
             
-            // thinking完成时停止thinking状态
+            // thinking完成时停止thinking状态并自动收起
             if (parsed.thinkingComplete) {
               console.log(`✅ UI: Thinking phase completed, switching to response mode`);
               setIsThinking(false);
+              // 自动收起thinking卡片
+              setTimeout(() => {
+                setIsThinkingExpanded(false);
+              }, 500); // 延迟500ms收起，让用户能看到完整的thinking内容
             }
             
             // 处理response内容
             if (parsed.response) {
               console.log(`💬 UI: Processing response content:`, JSON.stringify(parsed.response));
-              // 如果还没有添加assistant消息，添加一个
-              if (!assistantMessageAdded) {
-                console.log(`➕ UI: Adding first assistant message`);
-                assistantMessageAdded = true;
-                const assistantMessage = { 
-                  role: 'assistant' as const, 
-                  content: parsed.response, 
-                  timestamp: new Date() 
-                };
-                setMessages(prev => [...prev, assistantMessage]);
-              } else {
-                console.log(`🔄 UI: Updating existing assistant message`);
-                // 更新现有的assistant消息
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  const lastMessage = newMessages[newMessages.length - 1];
-                  if (lastMessage.role === 'assistant') {
-                    const newContent = lastMessage.content + parsed.response;
-                    console.log(`💬 UI: Updated response content length: ${newContent.length}`);
-                    lastMessage.content = newContent;
-                  }
-                  return newMessages;
-                });
-              }
+              // 更新现有的assistant消息
+              console.log(`🔄 UI: Updating existing assistant message`);
+              setMessages(prev => {
+                const newMessages = [...prev];
+                const lastMessage = newMessages[newMessages.length - 1];
+                if (lastMessage.role === 'assistant') {
+                  const newContent = lastMessage.content + parsed.response;
+                  console.log(`💬 UI: Updated response content length: ${newContent.length}`);
+                  lastMessage.content = newContent;
+                }
+                return newMessages;
+              });
             }
           },
           () => {
@@ -412,6 +413,7 @@ const NewTab = () => {
       setThinkingContent('');
       setShowThinking(false);
       setIsThinking(false);
+      setIsThinkingExpanded(true); // 重置为默认展开
       if (streamParserRef.current) {
         streamParserRef.current.reset();
       }
@@ -422,6 +424,7 @@ const NewTab = () => {
       setThinkingContent('');
       setShowThinking(false);
       setIsThinking(false);
+      setIsThinkingExpanded(true); // 重置为默认展开
       if (streamParserRef.current) {
         streamParserRef.current.reset();
       }
@@ -769,7 +772,7 @@ const NewTab = () => {
                             </div>
                             
                             {/* 底部操作栏 */}
-                            {isLastMessage && message.content && (
+                            {isLastMessage && (isLoading || message.content) && (
                               <div className="flex items-center gap-1 mt-3">
                                 {/* Loading spinner */}
                                 {isLoading && (
