@@ -717,13 +717,10 @@ const NewTab = () => {
                                     
                                     {/* Content */}
                                     <div className={cn(
-                                      'px-4 pb-3 text-sm leading-relaxed animate-fadeIn',
+                                      'px-4 pb-3 text-sm leading-relaxed animate-fadeIn whitespace-pre-wrap',
                                       isLight ? 'text-gray-700' : 'text-gray-300'
                                     )}>
                                       {thinkingContent}
-                                      {isThinking && (
-                                        <span className="inline-block w-2 h-4 bg-current animate-pulse ml-0.5" />
-                                      )}
                                     </div>
                                   </>
                                 ) : (
@@ -762,7 +759,7 @@ const NewTab = () => {
                           {/* Response内容 */}
                           <div className="max-w-4xl">
                             <div className={cn(
-                              'text-base leading-relaxed',
+                              'text-base leading-relaxed whitespace-pre-wrap',
                               isLight ? 'text-gray-900' : 'text-gray-100'
                             )}>
                               {message.content || (
