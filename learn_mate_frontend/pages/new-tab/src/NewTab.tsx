@@ -170,16 +170,6 @@ const NewTab = () => {
     return "晚上好";
   };
   
-  // 格式化内容，将段落分隔并处理代码
-  const formatContent = (content: string) => {
-    // 将双换行替换为段落标签，单换行保留
-    const paragraphs = content.split('\n\n');
-    return paragraphs.map((para, index) => {
-      // 替换行内代码
-      const formattedPara = para.replace(/`([^`]+)`/g, '<code>$1</code>');
-      return <p key={index} dangerouslySetInnerHTML={{ __html: formattedPara }} />;
-    });
-  };
 
   // 自动滚动到底部
   const scrollToBottom = () => {
