@@ -765,7 +765,7 @@ const NewTab = () => {
                                     
                                     {/* Content */}
                                     <div className={cn(
-                                      'px-4 pb-3 text-sm leading-relaxed animate-fadeIn thinking-content',
+                                      'px-4 pb-4 text-sm leading-relaxed animate-fadeIn thinking-content',
                                       isLight ? 'text-gray-700' : 'text-gray-300 dark'
                                     )}>
                                       {formatContent(thinkingContent)}
@@ -786,10 +786,12 @@ const NewTab = () => {
                                     )}>
                                       {(() => {
                                         // 获取第一句话（到句号、感叹号或问号为止）
-                                        const firstSentence = thinkingContent.match(/^[^.!?]+[.!?]/)?.[0] || thinkingContent.split('\n')[0];
-                                        return firstSentence.length < thinkingContent.length 
-                                          ? firstSentence + '...' 
-                                          : firstSentence;
+                                        const firstSentence = thinkingContent.match(/^[^.!?。！？]+[.!?。！？]/)?.[0] || thinkingContent.split('\n')[0] || thinkingContent;
+                                        // 限制最大长度为100个字符
+                                        const truncated = firstSentence.length > 100 ? firstSentence.substring(0, 100) : firstSentence;
+                                        return truncated.length < thinkingContent.length 
+                                          ? truncated + '...' 
+                                          : truncated;
                                       })()}
                                     </span>
                                     <span className={cn(
