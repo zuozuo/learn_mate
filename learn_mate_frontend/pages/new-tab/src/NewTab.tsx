@@ -683,7 +683,7 @@ const NewTab = () => {
                                 : 'bg-gray-800 border-gray-700'
                             )}>
                               <div className={cn(
-                                'transition-all duration-200',
+                                'transition-all duration-300 ease-in-out',
                                 isThinkingExpanded ? 'max-h-[500px]' : 'max-h-[60px]'
                               )}>
                                 {isThinkingExpanded ? (
@@ -709,7 +709,7 @@ const NewTab = () => {
                                         )}>
                                           1s
                                         </span>
-                                        <svg className={cn('w-5 h-5 transition-transform duration-200', isThinkingExpanded && 'rotate-180')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className={cn('w-5 h-5 transition-transform duration-300', isThinkingExpanded && 'rotate-180')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                         </svg>
                                       </div>
@@ -799,41 +799,21 @@ const NewTab = () => {
                                   </svg>
                                 </button>
                                 
-                                {/* Thumbs up */}
-                                <button
-                                  className={cn(
-                                    'p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors',
-                                    isLight ? 'text-gray-500 hover:text-gray-700' : 'text-gray-400 hover:text-gray-200'
-                                  )}
-                                  title="有帮助"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
-                                  </svg>
-                                </button>
-                                
-                                {/* Thumbs down */}
-                                <button
-                                  className={cn(
-                                    'p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors',
-                                    isLight ? 'text-gray-500 hover:text-gray-700' : 'text-gray-400 hover:text-gray-200'
-                                  )}
-                                  title="无帮助"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
-                                  </svg>
-                                </button>
                                 
                                 {/* Retry button */}
                                 <button
                                   onClick={() => {
-                                    // 获取上一个用户消息进行重试
-                                    const lastUserMessageIndex = messages.slice(0, -1).findLastIndex(m => m.role === 'user');
+                                    // 找到最后一条用户消息
+                                    const lastUserMessageIndex = messages.findLastIndex(m => m.role === 'user');
                                     if (lastUserMessageIndex >= 0) {
-                                      const lastUserMessage = messages[lastUserMessageIndex];
+                                      // 保留到最后一条用户消息为止的所有消息
                                       setMessages(messages.slice(0, lastUserMessageIndex + 1));
-                                      setInputMessage(lastUserMessage.content);
+                                      // 清空thinking内容
+                                      setThinkingContent('');
+                                      setShowThinking(false);
+                                      // 重新发送最后的用户消息
+                                      const lastUserMessage = messages[lastUserMessageIndex].content;
+                                      setInputMessage(lastUserMessage);
                                       setTimeout(() => sendMessage(), 100);
                                     }
                                   }}
