@@ -776,7 +776,7 @@ const NewTab = () => {
                           {/* Thinking 卡片 - 在response上方 */}
                           {isLastMessage && thinkingContent && (
                             <div className={cn(
-                              'rounded-lg border overflow-hidden transition-all duration-200 mb-2',
+                              'rounded-lg border overflow-hidden transition-all duration-200 mb-3',
                               isLight 
                                 ? 'bg-gray-50 border-gray-200' 
                                 : 'bg-gray-800 border-gray-700'
