@@ -38,6 +38,7 @@ dependencies = [
     "tqdm>=4.67.1",
     "colorama>=0.4.6",
     "transformers>=4.46.0",
+    "torch>=2.0.0",
 ]
 
 [tool.setuptools.packages.find]
