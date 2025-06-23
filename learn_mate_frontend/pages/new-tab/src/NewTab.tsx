@@ -427,39 +427,66 @@ const NewTab = () => {
           <div className="flex-1 flex flex-col">
             {/* 消息列表 */}
             <div className="flex-1 overflow-y-auto">
-              <div className="max-w-4xl mx-auto px-8 py-8 space-y-6">
+              <div className="max-w-4xl mx-auto px-8 py-8 space-y-8">
                 {messages.map((message, index) => (
-                  <div key={index} className={cn('flex', 
-                    message.role === 'user' ? 'justify-end' : 'justify-start')}>
+                  <div key={index} className="flex items-start space-x-4">
+                    {/* 头像 */}
                     <div className={cn(
-                      'max-w-2xl rounded-2xl px-6 py-4',
-                      message.role === 'user' 
+                      'w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold shrink-0',
+                      message.role === 'user'
                         ? isLight 
-                          ? 'bg-orange-500 text-white' 
-                          : 'bg-orange-600 text-white'
+                          ? 'bg-gray-600 text-white' 
+                          : 'bg-gray-700 text-white'
                         : isLight 
-                          ? 'bg-gray-100 text-gray-900' 
-                          : 'bg-gray-800 text-gray-100'
+                          ? 'bg-orange-100 text-orange-600' 
+                          : 'bg-orange-500/20 text-orange-400'
                     )}>
-                      <div className="whitespace-pre-wrap break-words leading-relaxed">
-                        {message.content}
-                      </div>
-                      {message.timestamp && (
-                        <div className={cn('text-xs mt-2 opacity-70')}>
-                          {message.timestamp.toLocaleTimeString()}
+                      {message.role === 'user' ? 'Z' : '🎓'}
+                    </div>
+                    
+                    {/* 消息内容 */}
+                    <div className="flex-1 min-w-0">
+                      <div className={cn(
+                        'rounded-2xl px-6 py-4',
+                        message.role === 'user' 
+                          ? isLight 
+                            ? 'bg-gray-100 text-gray-900' 
+                            : 'bg-gray-800 text-gray-100'
+                          : isLight 
+                            ? 'bg-gray-100 text-gray-900' 
+                            : 'bg-gray-800 text-gray-100'
+                      )}>
+                        <div className="whitespace-pre-wrap break-words leading-relaxed">
+                          {message.content}
                         </div>
-                      )}
+                        {message.timestamp && (
+                          <div className={cn('text-xs mt-2 opacity-70')}>
+                            {message.timestamp.toLocaleTimeString()}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
                 
                 {/* 加载状态 */}
                 {isLoading && (
-                  <div className="flex justify-start">
-                    <div className="max-w-2xl w-full">
+                  <div className="flex items-start space-x-4">
+                    {/* AI 头像 */}
+                    <div className={cn(
+                      'w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0',
+                      isLight 
+                        ? 'bg-orange-100 text-orange-600' 
+                        : 'bg-orange-500/20 text-orange-400'
+                    )}>
+                      🎓
+                    </div>
+                    
+                    {/* 思考和回复内容 */}
+                    <div className="flex-1 min-w-0">
                       {/* 思考过程卡片 */}
                       <div className={cn(
-                        'rounded-xl border px-4 py-3 mb-2 loading-message',
+                        'rounded-xl border px-4 py-3 mb-3 loading-message',
                         isLight 
                           ? 'bg-gray-50 border-gray-200 text-gray-700' 
                           : 'bg-gray-800/50 border-gray-700 text-gray-300'
