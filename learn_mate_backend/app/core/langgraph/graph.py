@@ -63,21 +63,21 @@ class LangGraphAgent:
         self._graph: Optional[CompiledStateGraph] = None
 
         logger.info(
-            "llm_initialized", 
+            "llm_initialized",
             provider=settings.LLM_PROVIDER,
-            model=settings.LLM_MODEL, 
-            environment=settings.ENVIRONMENT.value
+            model=settings.LLM_MODEL,
+            environment=settings.ENVIRONMENT.value,
         )
 
     def _create_llm(self):
         """Create LLM instance based on the configured provider.
-        
+
         Returns:
             Configured LLM instance (ChatOpenAI, ChatOllama, etc.)
         """
         provider = settings.LLM_PROVIDER.lower()
         model_kwargs = self._get_model_kwargs()
-        
+
         if provider == "openai":
             return ChatOpenAI(
                 model=settings.LLM_MODEL,
@@ -88,7 +88,7 @@ class LangGraphAgent:
                 streaming=True,  # 启用流式传输
                 **model_kwargs,
             )
-        
+
         elif provider == "openrouter":
             return ChatOpenAI(
                 model=settings.LLM_MODEL,
@@ -97,13 +97,10 @@ class LangGraphAgent:
                 max_tokens=settings.MAX_TOKENS,
                 base_url=settings.OPENROUTER_BASE_URL,
                 streaming=True,  # 启用流式传输
-                default_headers={
-                    "HTTP-Referer": "https://learn-mate.ai",
-                    "X-Title": "Learn Mate"
-                },
+                default_headers={"HTTP-Referer": "https://learn-mate.ai", "X-Title": "Learn Mate"},
                 **model_kwargs,
             )
-        
+
         elif provider == "ollama":
             # Ollama doesn't use API keys and has different parameter structure
             ollama_kwargs = {
@@ -114,9 +111,9 @@ class LangGraphAgent:
             # Note: Ollama may not support all OpenAI parameters
             if "max_tokens" in model_kwargs:
                 ollama_kwargs["num_predict"] = settings.MAX_TOKENS
-            
+
             return ChatOllama(**ollama_kwargs)
-        
+
         else:
             logger.warning(f"Unknown LLM provider: {provider}, falling back to OpenAI")
             return ChatOpenAI(
@@ -150,14 +147,14 @@ class LangGraphAgent:
 
     def _get_model_name(self) -> str:
         """Get model name from LLM instance, compatible with different providers.
-        
+
         Returns:
             str: The model name for metrics and logging
         """
         # Try different attribute names based on LLM provider
-        if hasattr(self.llm, 'model_name'):
+        if hasattr(self.llm, "model_name"):
             return self.llm.model_name
-        elif hasattr(self.llm, 'model'):
+        elif hasattr(self.llm, "model"):
             return self.llm.model
         else:
             # Fallback to configured model name
@@ -242,9 +239,9 @@ class LangGraphAgent:
                         "using_fallback_model", model=fallback_model, environment=settings.ENVIRONMENT.value
                     )
                     # Update model name based on LLM provider
-                    if hasattr(self.llm, 'model_name'):
+                    if hasattr(self.llm, "model_name"):
                         self.llm.model_name = fallback_model
-                    elif hasattr(self.llm, 'model'):
+                    elif hasattr(self.llm, "model"):
                         self.llm.model = fallback_model
 
                 continue
@@ -389,7 +386,7 @@ class LangGraphAgent:
         # 参考: https://github.com/langchain-ai/langchain/issues/26971
         from app.core.prompts import SYSTEM_PROMPT
         from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-        
+
         try:
             # 转换消息格式
             langchain_messages = [SystemMessage(content=SYSTEM_PROMPT)]
@@ -398,62 +395,53 @@ class LangGraphAgent:
                     langchain_messages.append(HumanMessage(content=msg.content))
                 elif msg.role == "assistant":
                     langchain_messages.append(AIMessage(content=msg.content))
-            
+
             token_count = 0
             accumulated_content = ""
-            
+
             # 使用不带工具的 LLM 直接流式
             async for chunk in self.llm.astream(langchain_messages):
                 if chunk.content:
                     token_count += 1
                     content = chunk.content
                     accumulated_content += content
-                    
+
                     logger.debug(
                         "streaming_token",
                         session_id=session_id,
                         token_number=token_count,
                         token_length=len(content),
-                        accumulated_length=len(accumulated_content)
+                        accumulated_length=len(accumulated_content),
                     )
-                    
+
                     yield content
-            
+
             # 流式完成后，保存到历史记录
             if accumulated_content and self._graph:
                 try:
                     # 将完整的对话保存到 LangGraph 历史
-                    complete_messages = messages + [
-                        Message(role="assistant", content=accumulated_content)
-                    ]
+                    complete_messages = messages + [Message(role="assistant", content=accumulated_content)]
                     config = {"configurable": {"thread_id": session_id}}
-                    
+
                     # 使用 invoke（非流式）来保存历史，这会通过 _chat 方法
                     await self._graph.ainvoke(
-                        {"messages": dump_messages(complete_messages), "session_id": session_id},
-                        config
+                        {"messages": dump_messages(complete_messages), "session_id": session_id}, config
                     )
-                    
+
                     logger.info(
-                        "streaming_history_saved",
-                        session_id=session_id,
-                        content_length=len(accumulated_content)
+                        "streaming_history_saved", session_id=session_id, content_length=len(accumulated_content)
                     )
                 except Exception as e:
-                    logger.error(
-                        "streaming_history_save_failed",
-                        session_id=session_id,
-                        error=str(e)
-                    )
+                    logger.error("streaming_history_save_failed", session_id=session_id, error=str(e))
                     # 历史保存失败不影响流式响应
-            
+
             logger.info(
                 "streaming_completed",
                 session_id=session_id,
                 total_tokens=token_count,
-                total_content_length=len(accumulated_content)
+                total_content_length=len(accumulated_content),
             )
-            
+
         except Exception as stream_error:
             logger.error("Error in stream processing", error=str(stream_error), session_id=session_id)
             raise stream_error

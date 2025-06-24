@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 class MessageRole(str, Enum):
     """Enum for message roles."""
+
     USER = "user"
     ASSISTANT = "assistant"
     SYSTEM = "system"
@@ -23,7 +24,7 @@ class MessageRole(str, Enum):
 
 class ChatMessage(BaseModel, table=True):
     """Chat message model for storing messages in conversations.
-    
+
     Attributes:
         id: The primary key (UUID)
         conversation_id: Foreign key to conversation
@@ -35,27 +36,23 @@ class ChatMessage(BaseModel, table=True):
         metadata: Additional metadata as JSONB
         conversation: Relationship to conversation
     """
+
     __tablename__ = "chat_messages"
-    __table_args__ = (
-        UniqueConstraint("conversation_id", "message_index", name="unique_conversation_message_index"),
-    )
-    
+    __table_args__ = (UniqueConstraint("conversation_id", "message_index", name="unique_conversation_message_index"),)
+
     id: UUID = Field(
         default_factory=uuid4,
         primary_key=True,
         index=True,
-        sa_column_kwargs={"server_default": text("gen_random_uuid()")}
+        sa_column_kwargs={"server_default": text("gen_random_uuid()")},
     )
     conversation_id: UUID = Field(foreign_key="conversations.id", index=True)
     role: MessageRole = Field(max_length=50)
     content: str
     thinking: Optional[str] = Field(default=None)
     message_index: int = Field(index=True)
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
-        index=True
-    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), index=True)
     metadata_json: dict = Field(default_factory=dict, sa_column=Column(JSON))
-    
+
     # Relationships
     conversation: "Conversation" = Relationship(back_populates="messages")

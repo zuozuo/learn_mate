@@ -133,15 +133,12 @@ class Settings:
         # Application Settings
         self.PROJECT_NAME = os.getenv("PROJECT_NAME", "Learn Mate Backend")
         self.VERSION = os.getenv("VERSION", "0.1.0")
-        self.DESCRIPTION = os.getenv(
-            "DESCRIPTION", "Learn Mate Backend - AI-powered learning assistant"
-        )
+        self.DESCRIPTION = os.getenv("DESCRIPTION", "Learn Mate Backend - AI-powered learning assistant")
         self.API_V1_STR = os.getenv("API_V1_STR", "/api/v1")
         self.DEBUG = os.getenv("DEBUG", "false").lower() in ("true", "1", "t", "yes")
 
         # CORS Settings
         self.ALLOWED_ORIGINS = parse_list_from_env("ALLOWED_ORIGINS", ["*"])
-
 
         # LangGraph Configuration
         self.LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai").lower()  # openai, openrouter, ollama
@@ -151,7 +148,7 @@ class Settings:
         self.DEFAULT_LLM_TEMPERATURE = float(os.getenv("DEFAULT_LLM_TEMPERATURE", "0.2"))
         self.MAX_TOKENS = int(os.getenv("MAX_TOKENS", "2000"))
         self.MAX_LLM_CALL_RETRIES = int(os.getenv("MAX_LLM_CALL_RETRIES", "3"))
-        
+
         # Provider-specific configurations
         self.OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", self.LLM_API_KEY)
         self.OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")

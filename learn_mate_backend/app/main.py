@@ -32,7 +32,6 @@ from app.services.database import database_service
 load_dotenv()
 
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Handle application startup and shutdown events."""

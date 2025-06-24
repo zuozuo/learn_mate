@@ -1,14 +1,16 @@
 import '@src/NewTab.css';
 import '@src/NewTab.scss';
-import { t } from '@extension/i18n';
+import { ConversationList } from './components/ConversationList';
+import { apiService } from './services/api';
+import { authService } from './services/auth';
+import { conversationService } from './services/conversation';
 import { useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
 import { exampleThemeStorage } from '@extension/storage';
 import { cn, ErrorDisplay, LoadingSpinner, ToggleButton } from '@extension/ui';
 import { useState, useRef, useEffect } from 'react';
-import { apiService, type Message as ApiMessage } from './services/api';
-import { authService, type User } from './services/auth';
-import { conversationService, type ConversationDetail } from './services/conversation';
-import { ConversationList, type ConversationListRef } from './components/ConversationList';
+import type { ConversationListRef } from './components/ConversationList';
+import type { Message as ApiMessage } from './services/api';
+import type { User } from './services/auth';
 
 // 扩展Message类型以包含thinking内容
 interface Message extends ApiMessage {
@@ -27,41 +29,44 @@ class StreamParser {
   // Process a new chunk and return the thinking and response parts
   processChunk(chunk: string): { thinking: string; response: string; thinkingComplete: boolean } {
     this.chunkCount++;
-    
+
     // 处理JSON编码的字符串（如果chunk被JSON编码了）
     let processedChunk = chunk;
     if (chunk.startsWith('"') && chunk.endsWith('"')) {
       try {
         processedChunk = JSON.parse(chunk);
-      } catch (e) {
+      } catch {
         // 如果解析失败，保持原样
       }
     }
-    
+
     console.log(`🔄 StreamParser chunk #${this.chunkCount}:`, {
       incoming: JSON.stringify(chunk),
       processed: JSON.stringify(processedChunk),
       bufferBefore: JSON.stringify(this.buffer),
       isInThinking: this.isInThinking,
-      chunkLength: processedChunk.length
+      chunkLength: processedChunk.length,
     });
 
     this.buffer += processedChunk;
-    let result = { thinking: '', response: '', thinkingComplete: false };
+    const result = { thinking: '', response: '', thinkingComplete: false };
 
     // Check for <think> start tag
     if (!this.isInThinking && this.buffer.includes('<think>')) {
       console.log(`🧠 Found <think> tag start in chunk #${this.chunkCount}`);
       const parts = this.buffer.split('<think>');
-      console.log(`📋 Split by <think>:`, parts.map(p => JSON.stringify(p)));
-      
+      console.log(
+        `📋 Split by <think>:`,
+        parts.map(p => JSON.stringify(p)),
+      );
+
       // Content before <think> goes to response
       if (parts[0]) {
         this.responseContent += parts[0];
         result.response = parts[0];
         console.log(`💬 Response content before thinking:`, JSON.stringify(parts[0]));
       }
-      
+
       // Start thinking mode
       this.isInThinking = true;
       this.buffer = parts.slice(1).join('<think>'); // Keep everything after first <think>
@@ -72,18 +77,21 @@ class StreamParser {
     if (this.isInThinking && this.buffer.includes('</think>')) {
       console.log(`🧠 Found </think> tag end in chunk #${this.chunkCount}`);
       const parts = this.buffer.split('</think>');
-      console.log(`📋 Split by </think>:`, parts.map(p => JSON.stringify(p)));
-      
+      console.log(
+        `📋 Split by </think>:`,
+        parts.map(p => JSON.stringify(p)),
+      );
+
       // Content before </think> goes to thinking
       this.thinkingContent += parts[0];
       result.thinking = parts[0];
       result.thinkingComplete = true;
       console.log(`🧠 Thinking content:`, JSON.stringify(parts[0]));
       console.log(`✅ Thinking phase completed`);
-      
+
       // End thinking mode
       this.isInThinking = false;
-      
+
       // Content after </think> goes to response
       const afterThinking = parts.slice(1).join('</think>');
       if (afterThinking) {
@@ -91,7 +99,7 @@ class StreamParser {
         result.response = (result.response || '') + afterThinking;
         console.log(`💬 Response content after thinking:`, JSON.stringify(afterThinking));
       }
-      
+
       this.buffer = '';
       console.log(`🔄 Switched to response mode, buffer cleared`);
     } else if (this.isInThinking) {
@@ -116,7 +124,7 @@ class StreamParser {
       response: JSON.stringify(result.response),
       thinkingComplete: result.thinkingComplete,
       totalThinking: this.thinkingContent.length,
-      totalResponse: this.responseContent.length
+      totalResponse: this.responseContent.length,
     });
 
     return result;
@@ -126,13 +134,13 @@ class StreamParser {
   getContent(): { thinking: string; response: string } {
     const content = {
       thinking: this.thinkingContent,
-      response: this.responseContent
+      response: this.responseContent,
     };
     console.log(`📈 Total accumulated content:`, {
       thinkingLength: content.thinking.length,
       responseLength: content.response.length,
       thinking: content.thinking.slice(0, 100) + (content.thinking.length > 100 ? '...' : ''),
-      response: content.response.slice(0, 100) + (content.response.length > 100 ? '...' : '')
+      response: content.response.slice(0, 100) + (content.response.length > 100 ? '...' : ''),
     });
     return content;
   }
@@ -142,9 +150,9 @@ class StreamParser {
     console.log(`🔄 StreamParser reset - previous stats:`, {
       totalChunks: this.chunkCount,
       finalThinkingLength: this.thinkingContent.length,
-      finalResponseLength: this.responseContent.length
+      finalResponseLength: this.responseContent.length,
     });
-    
+
     this.buffer = '';
     this.isInThinking = false;
     this.thinkingContent = '';
@@ -163,16 +171,14 @@ const NewTab = () => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [useStream, setUseStream] = useState(true);
   const [thinkingContent, setThinkingContent] = useState('');
-  const [isThinking, setIsThinking] = useState(false);
   const [showThinking, setShowThinking] = useState(false);
   const [isThinkingExpanded, setIsThinkingExpanded] = useState(true);
   const [copiedMessageId, setCopiedMessageId] = useState<number | null>(null);
   const [expandedThinkingIds, setExpandedThinkingIds] = useState<Set<number>>(new Set());
-  
+
   // 会话管理状态
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
-  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const streamParserRef = useRef<StreamParser | null>(null);
@@ -182,11 +188,10 @@ const NewTab = () => {
   // 获取问候语
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "早上好";
-    if (hour < 18) return "下午好";
-    return "晚上好";
+    if (hour < 12) return '早上好';
+    if (hour < 18) return '下午好';
+    return '晚上好';
   };
-  
 
   // 自动滚动到底部
   const scrollToBottom = () => {
@@ -204,7 +209,7 @@ const NewTab = () => {
         // 1. 检查后端连接状态
         const connected = await apiService.checkHealth();
         setIsConnected(connected);
-        
+
         if (!connected) {
           setIsInitializing(false);
           return;
@@ -212,10 +217,10 @@ const NewTab = () => {
 
         // 2. 初始化认证
         authService.init();
-        
+
         // 3. 检查是否已有认证用户
         let currentUser = authService.getUser();
-        
+
         if (!currentUser && connected) {
           // 4. 创建临时会话
           try {
@@ -224,7 +229,7 @@ const NewTab = () => {
             console.error('Failed to create temporary session:', error);
           }
         }
-        
+
         setUser(currentUser);
       } catch (error) {
         console.error('App initialization failed:', error);
@@ -239,12 +244,12 @@ const NewTab = () => {
   // 定期检查后端连接状态
   useEffect(() => {
     if (isInitializing) return;
-    
+
     const checkConnection = async () => {
       const connected = await apiService.checkHealth();
       setIsConnected(connected);
     };
-    
+
     const interval = setInterval(checkConnection, 30000); // 每30秒检查一次
     return () => clearInterval(interval);
   }, [isInitializing]);
@@ -254,18 +259,18 @@ const NewTab = () => {
     try {
       setIsLoading(true);
       const conversation = await conversationService.getConversation(conversationId);
-      
+
       // 转换消息格式
-      const convertedMessages: Message[] = conversation.messages.map((msg, index) => ({
+      const convertedMessages: Message[] = conversation.messages.map(msg => ({
         role: msg.role,
         content: msg.content,
         thinking: msg.thinking,
         timestamp: new Date(msg.created_at),
       }));
-      
+
       setMessages(convertedMessages);
       setCurrentConversationId(conversationId);
-      
+
       // 恢复thinking展开状态
       const expandedIds = new Set<number>();
       convertedMessages.forEach((msg, index) => {
@@ -274,7 +279,6 @@ const NewTab = () => {
         }
       });
       setExpandedThinkingIds(expandedIds);
-      
     } catch (error) {
       console.error('Failed to load conversation:', error);
       alert('Failed to load conversation');
@@ -307,7 +311,7 @@ const NewTab = () => {
     if (!conversationId) {
       try {
         const conversation = await conversationService.createConversation({
-          first_message: inputMessage.trim()
+          first_message: inputMessage.trim(),
         });
         conversationId = conversation.id;
         setCurrentConversationId(conversationId);
@@ -332,26 +336,23 @@ const NewTab = () => {
     const emptyAssistantMessage = {
       role: 'assistant' as const,
       content: '',
-      timestamp: new Date()
+      timestamp: new Date(),
     };
     setMessages(prev => [...prev, emptyAssistantMessage]);
 
     try {
       // 准备发送的消息列表（包含历史消息）
-      const allMessages = [...messages, userMessage];
 
       if (useStream) {
         // 使用流式响应
         streamParserRef.current = new StreamParser();
-        let assistantMessageAdded = true; // 已经添加了空消息
-        
+
         // 重置状态并立即显示thinking
         setThinkingContent('');
         thinkingContentRef.current = '';
         setShowThinking(true);
-        setIsThinking(true);
         setIsThinkingExpanded(true); // 默认展开
-        
+
         await conversationService.sendMessageStream(
           conversationId,
           userMessage.content,
@@ -359,7 +360,7 @@ const NewTab = () => {
           (chunk: string) => {
             console.log(`🔥 Received raw chunk from API:`, JSON.stringify(chunk));
             const parsed = streamParserRef.current!.processChunk(chunk);
-            
+
             // 处理thinking内容
             if (parsed.thinking) {
               console.log(`🧠 UI: Processing thinking content:`, JSON.stringify(parsed.thinking));
@@ -382,7 +383,7 @@ const NewTab = () => {
                 return newContent;
               });
             }
-            
+
             // thinking完成时停止thinking状态并自动收起
             if (parsed.thinkingComplete) {
               console.log(`✅ UI: Thinking phase completed, switching to response mode`);
@@ -391,7 +392,7 @@ const NewTab = () => {
               setTimeout(() => {
                 setIsThinkingExpanded(false);
               }, 500); // 延迟500ms收起，让用户能看到完整的thinking内容
-              
+
               // 将thinking内容保存到assistant消息中
               setMessages(prev => {
                 const newMessages = [...prev];
@@ -402,7 +403,7 @@ const NewTab = () => {
                 return newMessages;
               });
             }
-            
+
             // 处理response内容
             if (parsed.response) {
               console.log(`💬 UI: Processing response content:`, JSON.stringify(parsed.response));
@@ -433,11 +434,11 @@ const NewTab = () => {
             console.log(`📊 Final stream statistics:`, {
               thinkingLength: finalContent?.thinking.length || 0,
               responseLength: finalContent?.response.length || 0,
-              assistantMessageAdded
+              assistantMessageAdded,
             });
             setIsLoading(false);
             setIsThinking(false);
-            
+
             // 刷新会话列表以更新消息计数
             conversationListRef.current?.refresh();
           },
@@ -446,19 +447,22 @@ const NewTab = () => {
             console.log(`📊 Error state statistics:`, {
               assistantMessageAdded,
               currentThinkingLength: thinkingContent.length,
-              parseState: streamParserRef.current ? 'exists' : 'null'
+              parseState: streamParserRef.current ? 'exists' : 'null',
             });
             setIsLoading(false);
             setIsThinking(false);
-            
+
             // 如果还没有添加助手消息，先添加一个错误消息
             if (!assistantMessageAdded) {
               console.log(`➕ Adding error message (no assistant message yet)`);
-              setMessages(prev => [...prev, {
-                role: 'assistant' as const,
-                content: '抱歉，发生了错误。请稍后重试。',
-                timestamp: new Date()
-              }]);
+              setMessages(prev => [
+                ...prev,
+                {
+                  role: 'assistant' as const,
+                  content: '抱歉，发生了错误。请稍后重试。',
+                  timestamp: new Date(),
+                },
+              ]);
             } else {
               console.log(`🔄 Updating existing message with error`);
               // 更新现有消息为错误状态
@@ -471,12 +475,12 @@ const NewTab = () => {
                 return newMessages;
               });
             }
-          }
+          },
         );
       } else {
         // 使用普通响应
         const response = await conversationService.sendMessage(conversationId, userMessage.content);
-        
+
         // 更新最后一条assistant消息
         setMessages(prev => {
           const newMessages = [...prev];
@@ -487,9 +491,9 @@ const NewTab = () => {
           }
           return newMessages;
         });
-        
+
         setIsLoading(false);
-        
+
         // 刷新会话列表以更新消息计数
         conversationListRef.current?.refresh();
       }
@@ -498,7 +502,7 @@ const NewTab = () => {
       const errorMessage = {
         role: 'assistant' as const,
         content: '抱歉，发生了错误。请检查网络连接或稍后重试。',
-        timestamp: new Date()
+        timestamp: new Date(),
       };
       setMessages(prev => [...prev, errorMessage]);
       setIsLoading(false);
@@ -511,70 +515,66 @@ const NewTab = () => {
     if (!content || !content.trim()) {
       return null;
     }
-    
+
     // 首先去除开头和结尾的空白，包括换行符
     let trimmedContent = content.trim();
-    
+
     // 特殊处理：如果内容以多个换行符开始，去除它们
     trimmedContent = trimmedContent.replace(/^[\n\r]+/, '').replace(/[\n\r]+$/, '');
-    
+
     // 如果处理后内容为空，返回null
     if (!trimmedContent) {
       return null;
     }
-    
+
     // 将文本分割为段落
     const paragraphs = trimmedContent.split(/\n{2,}/); // 两个或更多换行符分割段落
-    
+
     // 调试：打印段落信息
     console.log(`Formatting content, trimmed: "${trimmedContent}", paragraphs count: ${paragraphs.length}`);
-    
-    const elements = paragraphs.map((paragraph, index) => {
-      // 跳过空段落
-      if (!paragraph.trim()) {
+
+    const elements = paragraphs
+      .map((paragraph, index) => {
+        // 跳过空段落
+        if (!paragraph.trim()) {
+          return null;
+        }
+
+        // 检查是否是代码块
+        if (paragraph.startsWith('```')) {
+          const lines = paragraph.split('\n');
+          const language = lines[0].slice(3).trim();
+          const code = lines.slice(1, -1).join('\n');
+
+          return (
+            <pre key={index}>
+              <code className={language ? `language-${language}` : ''}>{code}</code>
+            </pre>
+          );
+        }
+
+        // 处理普通段落
+        // 移除单个换行符，保留段落结构
+        const cleanedParagraph = paragraph.replace(/(?<!\n)\n(?!\n)/g, ' ').trim();
+
+        if (cleanedParagraph) {
+          return <p key={index}>{cleanedParagraph}</p>;
+        }
+
         return null;
-      }
-      
-      // 检查是否是代码块
-      if (paragraph.startsWith('```')) {
-        const lines = paragraph.split('\n');
-        const language = lines[0].slice(3).trim();
-        const code = lines.slice(1, -1).join('\n');
-        
-        return (
-          <pre key={index}>
-            <code className={language ? `language-${language}` : ''}>
-              {code}
-            </code>
-          </pre>
-        );
-      }
-      
-      // 处理普通段落
-      // 移除单个换行符，保留段落结构
-      const cleanedParagraph = paragraph.replace(/(?<!\n)\n(?!\n)/g, ' ').trim();
-      
-      if (cleanedParagraph) {
-        return (
-          <p key={index}>
-            {cleanedParagraph}
-          </p>
-        );
-      }
-      
-      return null;
-    }).filter(Boolean);
-    
+      })
+      .filter(Boolean);
+
     // 如果没有有效内容，返回null
     if (elements.length === 0) {
       return null;
     }
-    
+
     // 如果只有一个段落，不需要额外的margin
     if (elements.length === 1) {
       return <div className="single-paragraph">{elements}</div>;
     }
-    
+
     return elements;
   };
 
@@ -589,7 +589,7 @@ const NewTab = () => {
   // 处理输入框自动调整高度
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputMessage(e.target.value);
-    
+
     // 自动调整高度
     const textarea = e.target;
     textarea.style.height = 'auto';
@@ -632,18 +632,19 @@ const NewTab = () => {
   // 显示初始化加载状态
   if (isInitializing) {
     return (
-      <div className={cn('min-h-screen flex items-center justify-center', 
-        isLight ? 'bg-white' : 'bg-gray-950')}>
+      <div className={cn('flex min-h-screen items-center justify-center', isLight ? 'bg-white' : 'bg-gray-950')}>
         <div className="text-center">
           <div className="mb-6">
-            <div className={cn('w-16 h-16 rounded-full mx-auto flex items-center justify-center text-2xl',
-              isLight ? 'bg-orange-100 text-orange-600' : 'bg-orange-500/20 text-orange-400')}>
+            <div
+              className={cn(
+                'mx-auto flex h-16 w-16 items-center justify-center rounded-full text-2xl',
+                isLight ? 'bg-orange-100 text-orange-600' : 'bg-orange-500/20 text-orange-400',
+              )}>
               🎓
             </div>
           </div>
           <LoadingSpinner size="lg" />
-          <p className={cn('mt-4 text-lg font-medium', 
-            isLight ? 'text-gray-900' : 'text-gray-100')}>
+          <p className={cn('mt-4 text-lg font-medium', isLight ? 'text-gray-900' : 'text-gray-100')}>
             正在初始化 Learn Mate...
           </p>
         </div>
@@ -654,21 +655,23 @@ const NewTab = () => {
   return (
     <div className={cn('min-h-screen', isLight ? 'bg-white' : 'bg-gray-950')}>
       {/* 左侧边栏 */}
-      <div className={cn('fixed left-0 top-0 h-full w-64 border-r flex flex-col',
-        isLight ? 'bg-gray-50 border-gray-200' : 'bg-gray-900 border-gray-800')}>
-        
+      <div
+        className={cn(
+          'fixed left-0 top-0 flex h-full w-64 flex-col border-r',
+          isLight ? 'border-gray-200 bg-gray-50' : 'border-gray-800 bg-gray-900',
+        )}>
         {/* 顶部标题 */}
-        <div className="p-4 border-b border-inherit">
+        <div className="border-b border-inherit p-4">
           <div className="flex items-center space-x-3">
-            <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center text-lg',
-              isLight ? 'bg-orange-100 text-orange-600' : 'bg-orange-500/20 text-orange-400')}>
+            <div
+              className={cn(
+                'flex h-8 w-8 items-center justify-center rounded-lg text-lg',
+                isLight ? 'bg-orange-100 text-orange-600' : 'bg-orange-500/20 text-orange-400',
+              )}>
               🎓
             </div>
             <div>
-              <h1 className={cn('text-lg font-semibold', 
-                isLight ? 'text-gray-900' : 'text-white')}>
-                Learn Mate
-              </h1>
+              <h1 className={cn('text-lg font-semibold', isLight ? 'text-gray-900' : 'text-white')}>Learn Mate</h1>
             </div>
           </div>
         </div>
@@ -683,15 +686,12 @@ const NewTab = () => {
         />
 
         {/* 底部设置 */}
-        <div className="p-4 border-t border-inherit space-y-3">
+        <div className="space-y-3 border-t border-inherit p-4">
           {/* 连接状态 */}
           <div className="flex items-center justify-between">
-            <span className={cn('text-sm', isLight ? 'text-gray-600' : 'text-gray-300')}>
-              连接状态
-            </span>
+            <span className={cn('text-sm', isLight ? 'text-gray-600' : 'text-gray-300')}>连接状态</span>
             <div className="flex items-center space-x-1">
-              <div className={cn('w-2 h-2 rounded-full', 
-                isConnected ? 'bg-green-500' : 'bg-red-500')} />
+              <div className={cn('h-2 w-2 rounded-full', isConnected ? 'bg-green-500' : 'bg-red-500')} />
               <span className={cn('text-xs', isLight ? 'text-gray-500' : 'text-gray-400')}>
                 {isConnected ? '已连接' : '未连接'}
               </span>
@@ -701,9 +701,7 @@ const NewTab = () => {
           {/* 用户信息 */}
           {user && (
             <div className="flex items-center justify-between">
-              <span className={cn('text-sm', isLight ? 'text-gray-600' : 'text-gray-300')}>
-                用户
-              </span>
+              <span className={cn('text-sm', isLight ? 'text-gray-600' : 'text-gray-300')}>用户</span>
               <span className={cn('text-xs', isLight ? 'text-gray-500' : 'text-gray-400')}>
                 {user.username.startsWith('temp_') ? '游客模式' : user.username}
               </span>
@@ -714,26 +712,30 @@ const NewTab = () => {
           <div className="flex space-x-2">
             <button
               onClick={() => setUseStream(!useStream)}
-              className={cn('flex-1 px-2 py-1 rounded text-xs font-medium transition-colors',
-                useStream 
-                  ? isLight ? 'bg-blue-100 text-blue-700' : 'bg-blue-500/20 text-blue-400'
-                  : isLight ? 'bg-gray-100 text-gray-600' : 'bg-gray-800 text-gray-400'
-              )}
-            >
+              className={cn(
+                'flex-1 rounded px-2 py-1 text-xs font-medium transition-colors',
+                useStream
+                  ? isLight
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-blue-500/20 text-blue-400'
+                  : isLight
+                    ? 'bg-gray-100 text-gray-600'
+                    : 'bg-gray-800 text-gray-400',
+              )}>
               {useStream ? '流式' : '普通'}
             </button>
-            
+
             <button
               onClick={clearChat}
               disabled={isLoading}
-              className={cn('flex-1 px-2 py-1 rounded text-xs font-medium transition-colors',
+              className={cn(
+                'flex-1 rounded px-2 py-1 text-xs font-medium transition-colors',
                 isLight ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-gray-800 text-gray-400 hover:bg-gray-700',
-                'disabled:opacity-50 disabled:cursor-not-allowed'
-              )}
-            >
+                'disabled:cursor-not-allowed disabled:opacity-50',
+              )}>
               清空
             </button>
-            
+
             <ToggleButton onClick={exampleThemeStorage.toggle} className="p-1">
               <span className="text-lg">{isLight ? '🌙' : '☀️'}</span>
             </ToggleButton>
@@ -742,18 +744,21 @@ const NewTab = () => {
       </div>
 
       {/* 主内容区域 */}
-      <div className="ml-64 flex flex-col min-h-screen">
+      <div className="ml-64 flex min-h-screen flex-col">
         {messages.length === 0 ? (
           /* 欢迎界面 */
-          <div className="flex-1 flex flex-col items-center justify-center px-8">
-            <div className="max-w-2xl w-full text-center">
+          <div className="flex flex-1 flex-col items-center justify-center px-8">
+            <div className="w-full max-w-2xl text-center">
               {/* 问候语 */}
               <div className="mb-12">
-                <div className={cn('text-2xl flex items-center justify-center space-x-2',
-                  isLight ? 'text-gray-900' : 'text-gray-100')}>
+                <div
+                  className={cn(
+                    'flex items-center justify-center space-x-2 text-2xl',
+                    isLight ? 'text-gray-900' : 'text-gray-100',
+                  )}>
                   <span>🌟</span>
                   <span className="font-medium">{getGreeting()}, 学习者</span>
-                  <span className={cn('text-lg ml-3', isLight ? 'text-gray-600' : 'text-gray-400')}>
+                  <span className={cn('ml-3 text-lg', isLight ? 'text-gray-600' : 'text-gray-400')}>
                     今天想学点什么？
                   </span>
                 </div>
@@ -767,60 +772,73 @@ const NewTab = () => {
                   onChange={handleInputChange}
                   onKeyPress={handleKeyPress}
                   placeholder={
-                    !isConnected ? "请先启动后端服务..." :
-                    !user ? "正在初始化用户..." :
-                    isLoading ? "正在思考中..." :
-                    "向 Learn Mate 提问..."
+                    !isConnected
+                      ? '请先启动后端服务...'
+                      : !user
+                        ? '正在初始化用户...'
+                        : isLoading
+                          ? '正在思考中...'
+                          : '向 Learn Mate 提问...'
                   }
                   disabled={!isConnected || !user || isLoading}
                   className={cn(
-                    'w-full resize-none rounded-2xl border-2 p-4 pr-16 text-lg focus:outline-none transition-all duration-200',
+                    'w-full resize-none rounded-2xl border-2 p-4 pr-16 text-lg transition-all duration-200 focus:outline-none',
                     'placeholder:text-gray-400',
-                    isLight 
-                      ? 'bg-white border-gray-200 text-gray-900 focus:border-orange-400 shadow-sm focus:shadow-md' 
-                      : 'bg-gray-900 border-gray-700 text-white focus:border-orange-500',
-                    (!isConnected || isLoading) && 'opacity-50 cursor-not-allowed'
+                    isLight
+                      ? 'border-gray-200 bg-white text-gray-900 shadow-sm focus:border-orange-400 focus:shadow-md'
+                      : 'border-gray-700 bg-gray-900 text-white focus:border-orange-500',
+                    (!isConnected || isLoading) && 'cursor-not-allowed opacity-50',
                   )}
                   rows={1}
                   style={{ minHeight: '60px', maxHeight: '160px' }}
                 />
-                
+
                 {/* 发送按钮 */}
                 <button
                   onClick={sendMessage}
                   disabled={!inputMessage.trim() || !isConnected || !user || isLoading}
                   className={cn(
-                    'absolute right-3 top-1/2 transform -translate-y-1/2',
-                    'w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200',
+                    'absolute right-3 top-1/2 -translate-y-1/2 transform',
+                    'flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200',
                     inputMessage.trim() && isConnected && user && !isLoading
-                      ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-md hover:shadow-lg' 
-                      : isLight ? 'bg-gray-200 text-gray-400' : 'bg-gray-700 text-gray-500',
-                    'disabled:cursor-not-allowed'
-                  )}
-                >
+                      ? 'bg-orange-500 text-white shadow-md hover:bg-orange-600 hover:shadow-lg'
+                      : isLight
+                        ? 'bg-gray-200 text-gray-400'
+                        : 'bg-gray-700 text-gray-500',
+                    'disabled:cursor-not-allowed',
+                  )}>
                   {isLoading ? (
                     <LoadingSpinner size="sm" />
                   ) : (
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
+                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
                     </svg>
                   )}
                 </button>
               </div>
 
               {/* 快捷操作提示 */}
-              <div className={cn('mt-6 text-sm flex items-center justify-center space-x-6',
-                isLight ? 'text-gray-500' : 'text-gray-400')}>
+              <div
+                className={cn(
+                  'mt-6 flex items-center justify-center space-x-6 text-sm',
+                  isLight ? 'text-gray-500' : 'text-gray-400',
+                )}>
                 <div className="flex items-center space-x-1">
-                  <kbd className={cn('px-2 py-1 rounded text-xs',
-                    isLight ? 'bg-gray-100 text-gray-600' : 'bg-gray-800 text-gray-300')}>
+                  <kbd
+                    className={cn(
+                      'rounded px-2 py-1 text-xs',
+                      isLight ? 'bg-gray-100 text-gray-600' : 'bg-gray-800 text-gray-300',
+                    )}>
                     Enter
                   </kbd>
                   <span>发送</span>
                 </div>
                 <div className="flex items-center space-x-1">
-                  <kbd className={cn('px-2 py-1 rounded text-xs',
-                    isLight ? 'bg-gray-100 text-gray-600' : 'bg-gray-800 text-gray-300')}>
+                  <kbd
+                    className={cn(
+                      'rounded px-2 py-1 text-xs',
+                      isLight ? 'bg-gray-100 text-gray-600' : 'bg-gray-800 text-gray-300',
+                    )}>
                     Shift + Enter
                   </kbd>
                   <span>换行</span>
@@ -828,47 +846,45 @@ const NewTab = () => {
               </div>
 
               {!isConnected && (
-                <div className={cn('mt-6 p-4 rounded-lg',
-                  isLight ? 'bg-red-50 text-red-700' : 'bg-red-500/10 text-red-400')}>
-                  <p className="text-sm">
-                    无法连接到后端服务，请确保后端服务已启动 (http://localhost:8000)
-                  </p>
+                <div
+                  className={cn(
+                    'mt-6 rounded-lg p-4',
+                    isLight ? 'bg-red-50 text-red-700' : 'bg-red-500/10 text-red-400',
+                  )}>
+                  <p className="text-sm">无法连接到后端服务，请确保后端服务已启动 (http://localhost:8000)</p>
                 </div>
               )}
             </div>
           </div>
         ) : (
           /* 聊天界面 */
-          <div className="flex-1 flex flex-col">
+          <div className="flex flex-1 flex-col">
             {/* 消息列表 */}
             <div className="flex-1 overflow-y-auto">
-              <div className="max-w-4xl mx-auto px-8 py-8">
+              <div className="mx-auto max-w-4xl px-8 py-8">
                 {messages.map((message, index) => {
                   const isLastMessage = index === messages.length - 1;
-                  const isAssistantMessage = message.role === 'assistant';
                   const messageThinking = isLastMessage && thinkingContent ? thinkingContent : message.thinking;
                   const isExpanded = isLastMessage ? isThinkingExpanded : expandedThinkingIds.has(index);
-                  
+
                   return (
-                    <div key={index} className={cn("mb-4", isLastMessage && "mb-0")}>
+                    <div key={index} className={cn('mb-4', isLastMessage && 'mb-0')}>
                       {message.role === 'user' ? (
                         /* 用户消息 - 头像在卡片内部 */
                         <div className="flex justify-start">
-                          <div className={cn(
-                            'rounded-2xl px-4 py-3 flex items-start gap-3',
-                            isLight 
-                              ? 'bg-gray-100 text-gray-900' 
-                              : 'bg-gray-800 text-gray-100'
-                          )}>
-                            <div className={cn(
-                              'w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5',
-                              isLight 
-                                ? 'bg-gray-300 text-gray-700' 
-                                : 'bg-gray-600 text-gray-200'
+                          <div
+                            className={cn(
+                              'flex items-start gap-3 rounded-2xl px-4 py-3',
+                              isLight ? 'bg-gray-100 text-gray-900' : 'bg-gray-800 text-gray-100',
                             )}>
+                            <div
+                              className={cn(
+                                'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
+                                isLight ? 'bg-gray-300 text-gray-700' : 'bg-gray-600 text-gray-200',
+                              )}>
                               Z
                             </div>
-                            <div className="whitespace-pre-wrap break-words leading-relaxed text-base">
+                            <div className="whitespace-pre-wrap break-words text-base leading-relaxed">
                               {message.content}
                             </div>
                           </div>
@@ -878,16 +894,16 @@ const NewTab = () => {
                         <div>
                           {/* Thinking 卡片 - 在response上方 */}
                           {messageThinking && (
-                            <div className={cn(
-                              'rounded-lg border overflow-hidden transition-all duration-200 mb-4',
-                              isLight 
-                                ? 'bg-gray-50 border-gray-200' 
-                                : 'bg-gray-800 border-gray-700'
-                            )}>
-                              <div className={cn(
-                                'transition-all duration-300 ease-in-out',
-                                isExpanded ? 'max-h-[500px]' : 'max-h-[60px]'
+                            <div
+                              className={cn(
+                                'mb-4 overflow-hidden rounded-lg border transition-all duration-200',
+                                isLight ? 'border-gray-200 bg-gray-50' : 'border-gray-700 bg-gray-800',
                               )}>
+                              <div
+                                className={cn(
+                                  'transition-all duration-300 ease-in-out',
+                                  isExpanded ? 'max-h-[500px]' : 'max-h-[60px]',
+                                )}>
                                 {isExpanded ? (
                                   <>
                                     {/* Header - 只在展开时显示，整个header可点击 */}
@@ -908,34 +924,44 @@ const NewTab = () => {
                                         }
                                       }}
                                       className={cn(
-                                        'w-full px-4 py-2 flex items-center justify-between animate-fadeIn',
-                                        'hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors'
-                                      )}
-                                    >
-                                      <h3 className={cn(
-                                        'text-base font-medium',
-                                        isLight ? 'text-gray-900' : 'text-gray-100'
+                                        'animate-fadeIn flex w-full items-center justify-between px-4 py-2',
+                                        'transition-colors hover:bg-gray-100 dark:hover:bg-gray-700/50',
                                       )}>
+                                      <h3
+                                        className={cn(
+                                          'text-base font-medium',
+                                          isLight ? 'text-gray-900' : 'text-gray-100',
+                                        )}>
                                         Thought process
                                       </h3>
                                       <div className="flex items-center gap-2">
-                                        <span className={cn(
-                                          'text-sm',
-                                          isLight ? 'text-gray-500' : 'text-gray-400'
-                                        )}>
+                                        <span className={cn('text-sm', isLight ? 'text-gray-500' : 'text-gray-400')}>
                                           1s
                                         </span>
-                                        <svg className={cn('w-5 h-5 transition-transform duration-300', isExpanded && 'rotate-180')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        <svg
+                                          className={cn(
+                                            'h-5 w-5 transition-transform duration-300',
+                                            isExpanded && 'rotate-180',
+                                          )}
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24">
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M19 9l-7 7-7-7"
+                                          />
                                         </svg>
                                       </div>
                                     </button>
-                                    
+
                                     {/* Content */}
-                                    <div className={cn(
-                                      'px-4 pb-6 text-sm leading-relaxed animate-fadeIn thinking-content',
-                                      isLight ? 'text-gray-700' : 'text-gray-300 dark'
-                                    )}>
+                                    <div
+                                      className={cn(
+                                        'animate-fadeIn thinking-content px-4 pb-6 text-sm leading-relaxed',
+                                        isLight ? 'text-gray-700' : 'dark text-gray-300',
+                                      )}>
                                       {formatContent(messageThinking)}
                                     </div>
                                   </>
@@ -954,28 +980,33 @@ const NewTab = () => {
                                       }
                                     }}
                                     className={cn(
-                                      'w-full text-left px-4 py-3 flex items-center justify-between group',
-                                      'hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all duration-200'
-                                    )}
-                                  >
-                                    <span className={cn(
-                                      'text-sm leading-relaxed flex-1',
-                                      isLight ? 'text-gray-700' : 'text-gray-300'
+                                      'group flex w-full items-center justify-between px-4 py-3 text-left',
+                                      'transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-700/50',
                                     )}>
+                                    <span
+                                      className={cn(
+                                        'flex-1 text-sm leading-relaxed',
+                                        isLight ? 'text-gray-700' : 'text-gray-300',
+                                      )}>
                                       {(() => {
                                         // 获取第一句话（到句号、感叹号或问号为止）
-                                        const firstSentence = messageThinking.match(/^[^.!?。！？]+[.!?。！？]/)?.[0] || messageThinking.split('\n')[0] || messageThinking;
+                                        const firstSentence =
+                                          messageThinking.match(/^[^.!?。！？]+[.!?。！？]/)?.[0] ||
+                                          messageThinking.split('\n')[0] ||
+                                          messageThinking;
                                         // 限制最大长度为100个字符
-                                        const truncated = firstSentence.length > 100 ? firstSentence.substring(0, 100) : firstSentence;
-                                        return truncated.length < messageThinking.length 
-                                          ? truncated + '...' 
+                                        const truncated =
+                                          firstSentence.length > 100 ? firstSentence.substring(0, 100) : firstSentence;
+                                        return truncated.length < messageThinking.length
+                                          ? truncated + '...'
                                           : truncated;
                                       })()}
                                     </span>
-                                    <span className={cn(
-                                      'text-sm ml-2 shrink-0 transition-opacity duration-200',
-                                      isLight ? 'text-gray-500' : 'text-gray-400'
-                                    )}>
+                                    <span
+                                      className={cn(
+                                        'ml-2 shrink-0 text-sm transition-opacity duration-200',
+                                        isLight ? 'text-gray-500' : 'text-gray-400',
+                                      )}>
                                       1s
                                     </span>
                                   </button>
@@ -983,36 +1014,49 @@ const NewTab = () => {
                               </div>
                             </div>
                           )}
-                          
+
                           {/* Response内容 */}
                           <div className="max-w-4xl">
-                            <div className={cn(
-                              'text-base leading-relaxed response-content',
-                              isLight ? 'text-gray-900' : 'text-gray-100 dark'
-                            )}>
-                              {message.content ? formatContent(message.content) : (
-                                isLoading && isLastMessage && (
-                                  <span className="inline-block w-2 h-4 bg-current animate-pulse" />
-                                )
-                              )}
+                            <div
+                              className={cn(
+                                'response-content text-base leading-relaxed',
+                                isLight ? 'text-gray-900' : 'dark text-gray-100',
+                              )}>
+                              {message.content
+                                ? formatContent(message.content)
+                                : isLoading &&
+                                  isLastMessage && <span className="inline-block h-4 w-2 animate-pulse bg-current" />}
                             </div>
-                            
+
                             {/* 底部操作栏 */}
                             {isLastMessage && (isLoading || message.content) && (
-                              <div className="flex items-center gap-1 mt-3">
+                              <div className="mt-3 flex items-center gap-1">
                                 {/* Loading spinner */}
                                 {isLoading && (
-                                  <div className={cn(
-                                    'w-6 h-6 flex items-center justify-center',
-                                    isLight ? 'text-orange-500' : 'text-orange-400'
-                                  )}>
-                                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                  <div
+                                    className={cn(
+                                      'flex h-6 w-6 items-center justify-center',
+                                      isLight ? 'text-orange-500' : 'text-orange-400',
+                                    )}>
+                                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                                      <circle
+                                        className="opacity-25"
+                                        cx="12"
+                                        cy="12"
+                                        r="10"
+                                        stroke="currentColor"
+                                        strokeWidth="4"
+                                        fill="none"
+                                      />
+                                      <path
+                                        className="opacity-75"
+                                        fill="currentColor"
+                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                      />
                                     </svg>
                                   </div>
                                 )}
-                                
+
                                 {/* Copy button */}
                                 <button
                                   onClick={() => {
@@ -1021,31 +1065,40 @@ const NewTab = () => {
                                     setTimeout(() => setCopiedMessageId(null), 2000);
                                   }}
                                   className={cn(
-                                    'p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative',
-                                    isLight ? 'text-gray-500 hover:text-gray-700' : 'text-gray-400 hover:text-gray-200'
+                                    'relative rounded p-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800',
+                                    isLight ? 'text-gray-500 hover:text-gray-700' : 'text-gray-400 hover:text-gray-200',
                                   )}
-                                  title="复制"
-                                >
+                                  title="复制">
                                   {copiedMessageId === index ? (
                                     <>
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M5 13l4 4L19 7"
+                                        />
                                       </svg>
-                                      <span className={cn(
-                                        'absolute left-full ml-2 px-2 py-1 text-xs whitespace-nowrap rounded',
-                                        isLight ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'
-                                      )}>
+                                      <span
+                                        className={cn(
+                                          'absolute left-full ml-2 whitespace-nowrap rounded px-2 py-1 text-xs',
+                                          isLight ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900',
+                                        )}>
                                         已复制
                                       </span>
                                     </>
                                   ) : (
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                      />
                                     </svg>
                                   )}
                                 </button>
-                                
-                                
+
                                 {/* Retry button */}
                                 <button
                                   onClick={() => {
@@ -1060,41 +1113,41 @@ const NewTab = () => {
                                       setShowThinking(false);
                                       // 直接使用最后的用户消息内容发送，不需要设置inputMessage
                                       const lastUserMessageContent = messages[lastUserMessageIndex].content;
-                                      
+
                                       // 创建新的用户消息
                                       const userMessage = {
                                         role: 'user' as const,
                                         content: lastUserMessageContent,
                                       };
-                                      
+
                                       const messageWithTimestamp = { ...userMessage, timestamp: new Date() };
                                       setMessages(prev => [...prev, messageWithTimestamp]);
                                       setIsLoading(true);
-                                      
+
                                       // 立即添加空的assistant消息
                                       const emptyAssistantMessage = {
                                         role: 'assistant' as const,
                                         content: '',
-                                        timestamp: new Date()
+                                        timestamp: new Date(),
                                       };
                                       setMessages(prev => [...prev, emptyAssistantMessage]);
-                                      
+
                                       // 发送请求
                                       const allMessages = [...messages.slice(0, lastUserMessageIndex), userMessage];
-                                      
+
                                       // 重置状态并显示thinking
                                       streamParserRef.current = new StreamParser();
                                       setThinkingContent('');
                                       setShowThinking(true);
                                       setIsThinking(true);
                                       setIsThinkingExpanded(true);
-                                      
+
                                       // 发送流式请求
                                       apiService.sendMessageStream(
                                         allMessages,
                                         (chunk: string) => {
                                           const parsed = streamParserRef.current!.processChunk(chunk);
-                                          
+
                                           if (parsed.thinking) {
                                             setThinkingContent(prev => {
                                               // 如果是第一次添加内容，去除开头的空白
@@ -1104,14 +1157,14 @@ const NewTab = () => {
                                               return prev + parsed.thinking;
                                             });
                                           }
-                                          
+
                                           if (parsed.thinkingComplete) {
                                             setIsThinking(false);
                                             setTimeout(() => {
                                               setIsThinkingExpanded(false);
                                             }, 500);
                                           }
-                                          
+
                                           if (parsed.response) {
                                             setMessages(prev => {
                                               const newMessages = [...prev];
@@ -1136,27 +1189,28 @@ const NewTab = () => {
                                           console.error('Stream error:', error);
                                           setIsLoading(false);
                                           setIsThinking(false);
-                                        }
+                                        },
                                       );
                                     }
                                   }}
                                   className={cn(
-                                    'p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center gap-1',
-                                    isLight ? 'text-gray-500 hover:text-gray-700' : 'text-gray-400 hover:text-gray-200'
+                                    'flex items-center gap-1 rounded p-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800',
+                                    isLight ? 'text-gray-500 hover:text-gray-700' : 'text-gray-400 hover:text-gray-200',
                                   )}
-                                  title="重试"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                  title="重试">
+                                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                    />
                                   </svg>
                                   <span className="text-xs">Retry</span>
                                 </button>
-                                
+
                                 {/* Disclaimer text */}
-                                <span className={cn(
-                                  'text-xs ml-auto',
-                                  isLight ? 'text-gray-400' : 'text-gray-500'
-                                )}>
+                                <span className={cn('ml-auto text-xs', isLight ? 'text-gray-400' : 'text-gray-500')}>
                                   AI can make mistakes. Please double-check responses.
                                 </span>
                               </div>
@@ -1167,15 +1221,14 @@ const NewTab = () => {
                     </div>
                   );
                 })}
-                
-                
+
                 <div ref={messagesEndRef} />
               </div>
             </div>
 
             {/* 底部输入区域 */}
             <div className="border-t border-inherit">
-              <div className="max-w-4xl mx-auto px-8 py-6">
+              <div className="mx-auto max-w-4xl px-8 py-6">
                 <div className="relative">
                   <textarea
                     ref={inputRef}
@@ -1183,42 +1236,46 @@ const NewTab = () => {
                     onChange={handleInputChange}
                     onKeyPress={handleKeyPress}
                     placeholder={
-                      !isConnected ? "请先启动后端服务..." :
-                      !user ? "正在初始化用户..." :
-                      isLoading ? "正在思考中..." :
-                      "继续对话..."
+                      !isConnected
+                        ? '请先启动后端服务...'
+                        : !user
+                          ? '正在初始化用户...'
+                          : isLoading
+                            ? '正在思考中...'
+                            : '继续对话...'
                     }
                     disabled={!isConnected || !user || isLoading}
                     className={cn(
-                      'w-full resize-none rounded-2xl border-2 p-4 pr-16 focus:outline-none transition-all duration-200',
+                      'w-full resize-none rounded-2xl border-2 p-4 pr-16 transition-all duration-200 focus:outline-none',
                       'placeholder:text-gray-400',
-                      isLight 
-                        ? 'bg-white border-gray-200 text-gray-900 focus:border-orange-400 shadow-sm focus:shadow-md' 
-                        : 'bg-gray-900 border-gray-700 text-white focus:border-orange-500',
-                      (!isConnected || isLoading) && 'opacity-50 cursor-not-allowed'
+                      isLight
+                        ? 'border-gray-200 bg-white text-gray-900 shadow-sm focus:border-orange-400 focus:shadow-md'
+                        : 'border-gray-700 bg-gray-900 text-white focus:border-orange-500',
+                      (!isConnected || isLoading) && 'cursor-not-allowed opacity-50',
                     )}
                     rows={1}
                     style={{ minHeight: '56px', maxHeight: '120px' }}
                   />
-                  
+
                   {/* 发送按钮 */}
                   <button
                     onClick={sendMessage}
                     disabled={!inputMessage.trim() || !isConnected || !user || isLoading}
                     className={cn(
-                      'absolute right-3 top-1/2 transform -translate-y-1/2',
-                      'w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200',
+                      'absolute right-3 top-1/2 -translate-y-1/2 transform',
+                      'flex h-8 w-8 items-center justify-center rounded-full transition-all duration-200',
                       inputMessage.trim() && isConnected && user && !isLoading
-                        ? 'bg-orange-500 hover:bg-orange-600 text-white' 
-                        : isLight ? 'bg-gray-200 text-gray-400' : 'bg-gray-700 text-gray-500',
-                      'disabled:cursor-not-allowed'
-                    )}
-                  >
+                        ? 'bg-orange-500 text-white hover:bg-orange-600'
+                        : isLight
+                          ? 'bg-gray-200 text-gray-400'
+                          : 'bg-gray-700 text-gray-500',
+                      'disabled:cursor-not-allowed',
+                    )}>
                     {isLoading ? (
                       <LoadingSpinner size="sm" />
                     ) : (
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
+                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
                       </svg>
                     )}
                   </button>

@@ -2,7 +2,7 @@ import { getAuthHeaders } from './auth';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
-export interface Conversation {
+interface Conversation {
   id: string;
   title: string;
   summary?: string;
@@ -11,7 +11,7 @@ export interface Conversation {
   message_count?: number;
 }
 
-export interface ConversationMessage {
+interface ConversationMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -19,33 +19,30 @@ export interface ConversationMessage {
   created_at: string;
 }
 
-export interface ConversationDetail extends Conversation {
+interface ConversationDetail extends Conversation {
   messages: ConversationMessage[];
 }
 
-export interface ConversationListResponse {
+interface ConversationListResponse {
   conversations: Conversation[];
   total: number;
   page: number;
   limit: number;
 }
 
-export interface ConversationCreateRequest {
+interface ConversationCreateRequest {
   title?: string;
   first_message?: string;
 }
 
-export interface ConversationUpdateRequest {
+interface ConversationUpdateRequest {
   title: string;
 }
 
 class ConversationService {
-  private async request<T>(
-    path: string,
-    options: RequestInit = {}
-  ): Promise<T> {
+  private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const headers = await getAuthHeaders();
-    
+
     const response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
       headers: {
@@ -63,23 +60,17 @@ class ConversationService {
     return response.json();
   }
 
-  async getConversations(
-    page: number = 1,
-    limit: number = 20,
-    search?: string
-  ): Promise<ConversationListResponse> {
+  async getConversations(page: number = 1, limit: number = 20, search?: string): Promise<ConversationListResponse> {
     const params = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
     });
-    
+
     if (search) {
       params.append('search', search);
     }
 
-    return this.request<ConversationListResponse>(
-      `/api/v1/conversations?${params.toString()}`
-    );
+    return this.request<ConversationListResponse>(`/api/v1/conversations?${params.toString()}`);
   }
 
   async getConversation(id: string): Promise<ConversationDetail> {
@@ -93,10 +84,7 @@ class ConversationService {
     });
   }
 
-  async updateConversation(
-    id: string,
-    data: ConversationUpdateRequest
-  ): Promise<Conversation> {
+  async updateConversation(id: string, data: ConversationUpdateRequest): Promise<Conversation> {
     return this.request<Conversation>(`/api/v1/conversations/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -117,7 +105,7 @@ class ConversationService {
         body: JSON.stringify({
           messages: [{ role: 'user', content }],
         }),
-      }
+      },
     );
 
     return {
@@ -132,23 +120,20 @@ class ConversationService {
     conversationId: string,
     content: string,
     onChunk: (chunk: string) => void,
-    onThinking?: (thinking: string) => void
+    onThinking?: (thinking: string) => void,
   ): Promise<void> {
     const headers = await getAuthHeaders();
-    
-    const response = await fetch(
-      `${API_BASE_URL}/api/v1/conversations/${conversationId}/messages/stream`,
-      {
-        method: 'POST',
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [{ role: 'user', content }],
-        }),
-      }
-    );
+
+    const response = await fetch(`${API_BASE_URL}/api/v1/conversations/${conversationId}/messages/stream`, {
+      method: 'POST',
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messages: [{ role: 'user', content }],
+      }),
+    });
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
@@ -179,7 +164,7 @@ class ConversationService {
               if (data.done) {
                 return;
               }
-              
+
               if (data.content) {
                 // Check for thinking tags
                 if (data.content.includes('<think>')) {
@@ -194,11 +179,11 @@ class ConversationService {
                   }
                   thinkingContent = '';
                 }
-                
+
                 if (inThinking) {
                   thinkingContent += data.content;
                 }
-                
+
                 onChunk(data.content);
               }
             } catch (e) {
@@ -213,4 +198,12 @@ class ConversationService {
   }
 }
 
+export type {
+  Conversation,
+  ConversationMessage,
+  ConversationDetail,
+  ConversationListResponse,
+  ConversationCreateRequest,
+  ConversationUpdateRequest,
+};
 export const conversationService = new ConversationService();

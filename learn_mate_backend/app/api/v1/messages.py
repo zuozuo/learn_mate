@@ -27,13 +27,13 @@ async def send_message(
     current_user: User = Depends(get_current_user),
 ):
     """Send a message to a conversation and get AI response.
-    
+
     Args:
         request: FastAPI request object
         conversation_id: ID of the conversation
         chat_request: Chat request with message content
         current_user: Current authenticated user
-        
+
     Returns:
         AI response message
     """
@@ -44,22 +44,18 @@ async def send_message(
             if msg.role == "user":
                 user_message = msg.content
                 break
-        
+
         if not user_message:
             raise HTTPException(status_code=400, detail="No user message found")
-        
+
         with Session(database_service.engine) as session:
             service = EnhancedChatService(session)
             response = await service.send_message(
-                conversation_id=conversation_id,
-                user_id=current_user.id,
-                content=user_message
+                conversation_id=conversation_id, user_id=current_user.id, content=user_message
             )
-            
-            logger.info("message_sent", 
-                       conversation_id=str(conversation_id),
-                       user_id=current_user.id)
-            
+
+            logger.info("message_sent", conversation_id=str(conversation_id), user_id=current_user.id)
+
             return response
     except HTTPException:
         # Re-raise HTTPExceptions without modification
@@ -80,13 +76,13 @@ async def send_message_stream(
     current_user: User = Depends(get_current_user),
 ):
     """Send a message and get streaming AI response.
-    
+
     Args:
         request: FastAPI request object
         conversation_id: ID of the conversation
         chat_request: Chat request with message content
         current_user: Current authenticated user
-        
+
     Returns:
         Streaming response
     """
@@ -97,33 +93,29 @@ async def send_message_stream(
             if msg.role == "user":
                 user_message = msg.content
                 break
-        
+
         if not user_message:
             raise HTTPException(status_code=400, detail="No user message found")
-        
+
         async def event_generator():
             """Generate streaming events."""
             try:
                 with Session(database_service.engine) as session:
                     service = EnhancedChatService(session)
-                    
+
                     async for chunk in service.send_message_stream(
-                        conversation_id=conversation_id,
-                        user_id=current_user.id,
-                        content=user_message
+                        conversation_id=conversation_id, user_id=current_user.id, content=user_message
                     ):
                         if chunk:
                             response = StreamResponse(content=chunk, done=False)
                             yield f"data: {json.dumps(response.model_dump())}\n\n"
-                    
+
                     # Send completion message
                     final_response = StreamResponse(content="", done=True)
                     yield f"data: {json.dumps(final_response.model_dump())}\n\n"
-                    
-                    logger.info("message_streamed", 
-                               conversation_id=str(conversation_id),
-                               user_id=current_user.id)
-                    
+
+                    logger.info("message_streamed", conversation_id=str(conversation_id), user_id=current_user.id)
+
             except ValueError as e:
                 error_response = StreamResponse(content=str(e), done=True)
                 yield f"data: {json.dumps(error_response.model_dump())}\n\n"
@@ -131,9 +123,9 @@ async def send_message_stream(
                 logger.error("stream_message_failed", error=str(e))
                 error_response = StreamResponse(content="Internal error", done=True)
                 yield f"data: {json.dumps(error_response.model_dump())}\n\n"
-        
+
         return StreamingResponse(event_generator(), media_type="text/event-stream")
-        
+
     except HTTPException:
         raise
     except Exception as e:

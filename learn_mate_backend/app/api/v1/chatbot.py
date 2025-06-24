@@ -36,7 +36,6 @@ router = APIRouter()
 agent = LangGraphAgent()
 
 
-
 @router.post("/chat", response_model=ChatResponse)
 @limiter.limit(settings.RATE_LIMIT_ENDPOINTS["chat"][0])
 async def chat(
@@ -46,7 +45,7 @@ async def chat(
     current_user: User = Depends(get_current_user),
 ):
     """Process a chat request using LangGraph (backward compatibility).
-    
+
     This endpoint creates a temporary conversation for each request.
 
     Args:
@@ -74,28 +73,23 @@ async def chat(
             if msg.role == "user":
                 user_message = msg.content
                 break
-        
+
         if not user_message:
             raise HTTPException(status_code=400, detail="No user message found")
 
         # Create temporary conversation and process
         with DBSession(database_service.engine) as db_session:
             service = EnhancedChatService(db_session)
-            
+
             # Create temporary conversation
             conversation_id = await service.create_temporary_conversation(
-                user_id=current_user.id,
-                first_message=user_message
-            )
-            
-            # Get response (message already saved)
-            result = await agent.get_response(
-                chat_request.messages, session.id, user_id=session.user_id
+                user_id=current_user.id, first_message=user_message
             )
 
-            logger.info("chat_request_processed", 
-                       session_id=session.id,
-                       conversation_id=str(conversation_id))
+            # Get response (message already saved)
+            result = await agent.get_response(chat_request.messages, session.id, user_id=session.user_id)
+
+            logger.info("chat_request_processed", session_id=session.id, conversation_id=str(conversation_id))
 
             return ChatResponse(messages=result)
     except Exception as e:
@@ -112,7 +106,7 @@ async def chat_stream(
     current_user: User = Depends(get_current_user),
 ):
     """Process a chat request using LangGraph with streaming response (backward compatibility).
-    
+
     This endpoint creates a temporary conversation for each request.
 
     Args:
@@ -145,26 +139,26 @@ async def chat_stream(
             """
             try:
                 # Get model name based on LLM provider
-                model_name = getattr(agent.llm, 'model_name', None) or getattr(agent.llm, 'model', 'unknown')
+                model_name = getattr(agent.llm, "model_name", None) or getattr(agent.llm, "model", "unknown")
                 chunk_count = 0
                 total_content = ""
-                
+
                 with llm_stream_duration_seconds.labels(model=model_name).time():
                     async for chunk in agent.get_stream_response(
                         chat_request.messages, session.id, user_id=session.user_id
-                     ):
+                    ):
                         chunk_count += 1
                         total_content += chunk
-                        
+
                         logger.debug(
                             "streaming_chunk_details",
                             chunk_number=chunk_count,
                             chunk_content=repr(chunk[:50]) + "..." if len(chunk) > 50 else repr(chunk),
                             chunk_length=len(chunk),
                             total_length_so_far=len(total_content),
-                            session_id=session.id
+                            session_id=session.id,
                         )
-                        
+
                         # 直接转发原始chunk内容，不做任何解析处理
                         if chunk:
                             response = StreamResponse(content=chunk, done=False)

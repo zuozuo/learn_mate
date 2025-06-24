@@ -36,11 +36,11 @@ class ApiService {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    
+
     if (this.token) {
       headers.Authorization = `Bearer ${this.token}`;
     }
-    
+
     return headers;
   }
 
@@ -115,10 +115,10 @@ class ApiService {
 
   // 发送流式聊天消息
   async sendMessageStream(
-    messages: Message[], 
+    messages: Message[],
     onChunk: (chunk: string) => void,
     onComplete: () => void,
-    onError: (error: Error) => void
+    onError: (error: Error) => void,
   ): Promise<void> {
     try {
       const response = await fetch(`${this.baseUrl}/api/v1/chatbot/chat/stream`, {
@@ -141,7 +141,7 @@ class ApiService {
 
       while (true) {
         const { done, value } = await reader.read();
-        
+
         if (done) {
           onComplete();
           break;
@@ -155,12 +155,12 @@ class ApiService {
             try {
               const data = JSON.parse(line.slice(6));
               const streamResponse: StreamResponse = data;
-              
+
               if (streamResponse.content) {
                 // 直接传递原始内容，不做任何类型区分
                 onChunk(streamResponse.content);
               }
-              
+
               if (streamResponse.done) {
                 onComplete();
                 return;
@@ -207,7 +207,7 @@ class ApiService {
     const data = await response.json();
     return {
       session_id: data.session_id,
-      token: data.token.access_token
+      token: data.token.access_token,
     };
   }
 

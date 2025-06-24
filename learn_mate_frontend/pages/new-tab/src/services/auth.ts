@@ -2,11 +2,6 @@
 
 import { apiService } from './api';
 
-export interface User {
-  username: string;
-  email?: string;
-}
-
 class AuthService {
   private static readonly TOKEN_KEY = 'learn_mate_token';
   private static readonly USER_KEY = 'learn_mate_user';
@@ -43,26 +38,18 @@ class AuthService {
 
   // 登录
   async login(username: string, password: string): Promise<User> {
-    try {
-      const response = await apiService.login(username, password);
-      const user: User = { username };
-      this.setAuth(response.access_token, user);
-      return user;
-    } catch (error) {
-      throw error;
-    }
+    const response = await apiService.login(username, password);
+    const user: User = { username };
+    this.setAuth(response.access_token, user);
+    return user;
   }
 
   // 注册
   async register(username: string, email: string, password: string): Promise<User> {
-    try {
-      const response = await apiService.register(username, email, password);
-      const user: User = { username, email };
-      this.setAuth(response.access_token, user);
-      return user;
-    } catch (error) {
-      throw error;
-    }
+    const response = await apiService.register(username, email, password);
+    const user: User = { username, email };
+    this.setAuth(response.access_token, user);
+    return user;
   }
 
   // 登出
@@ -86,17 +73,17 @@ class AuthService {
     // 创建一个满足密码强度要求的临时密码
     const tempPassword = `TempPass123!${Math.random().toString(36).substr(2, 4)}`;
     const tempUser: User = { username: tempUserId, email: tempEmail };
-    
+
     try {
       // 尝试注册临时用户
       const userResponse = await apiService.register(tempUserId, tempEmail, tempPassword);
-      
+
       // 设置用户token
       apiService.setToken(userResponse.access_token);
-      
+
       // 创建聊天会话
       const sessionResponse = await apiService.createSession();
-      
+
       // 使用会话token进行后续的聊天
       this.setAuth(sessionResponse.token, tempUser);
       return tempUser;
@@ -105,13 +92,13 @@ class AuthService {
       // 如果注册失败，可能是因为用户已存在，尝试登录
       try {
         const loginResponse = await apiService.login(tempEmail, tempPassword);
-        
+
         // 设置用户token
         apiService.setToken(loginResponse.access_token);
-        
+
         // 创建聊天会话
         const sessionResponse = await apiService.createSession();
-        
+
         // 使用会话token进行后续的聊天
         this.setAuth(sessionResponse.token, tempUser);
         return tempUser;
@@ -123,4 +110,20 @@ class AuthService {
   }
 }
 
+export interface User {
+  username: string;
+  email?: string;
+}
+
 export const authService = new AuthService();
+
+// 导出 getAuthHeaders 函数供其他模块使用
+export async function getAuthHeaders(): Promise<Record<string, string>> {
+  const token = authService.getToken();
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+  return {
+    Authorization: `Bearer ${token}`,
+  };
+}

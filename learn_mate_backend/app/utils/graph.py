@@ -36,7 +36,7 @@ def prepare_messages(messages: list[Message], llm: BaseChatModel, system_prompt:
         max_messages = 10  # 最多保留10条历史消息
         if len(messages) > max_messages:
             messages = messages[-max_messages:]
-        
+
         return [Message(role="system", content=system_prompt)] + messages
     else:
         # 对于其他提供商，使用原来的 token 计数方法
@@ -51,7 +51,7 @@ def prepare_messages(messages: list[Message], llm: BaseChatModel, system_prompt:
                 allow_partial=False,
             )
             return [Message(role="system", content=system_prompt)] + trimmed_messages
-        except Exception as e:
+        except Exception:
             # 如果 token 计数失败，回退到简单方法
             max_messages = 5
             if len(messages) > max_messages:

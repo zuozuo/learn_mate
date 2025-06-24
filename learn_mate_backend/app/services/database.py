@@ -52,7 +52,7 @@ class DatabaseService:
 
             # Create tables (only if they don't exist)
             SQLModel.metadata.create_all(self.engine)
-            
+
             # Create database triggers
             self._create_triggers()
 
