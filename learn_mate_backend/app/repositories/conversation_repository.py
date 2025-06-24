@@ -133,7 +133,7 @@ class ConversationRepository:
         user_id: int,
         title: Optional[str] = None,
         summary: Optional[str] = None,
-        metadata: Optional[dict] = None
+        metadata_json: Optional[dict] = None
     ) -> Optional[Conversation]:
         """Update a conversation.
         
@@ -156,8 +156,8 @@ class ConversationRepository:
                 conversation.title = title
             if summary is not None:
                 conversation.summary = summary
-            if metadata is not None:
-                conversation.metadata = metadata
+            if metadata_json is not None:
+                conversation.metadata_json = metadata_json
             
             conversation.updated_at = datetime.now(UTC)
             

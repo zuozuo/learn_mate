@@ -46,7 +46,7 @@ class Conversation(BaseModel, table=True):
         sa_column_kwargs={"onupdate": lambda: datetime.now(UTC)}
     )
     is_deleted: bool = Field(default=False, index=True)
-    metadata: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    metadata_json: dict = Field(default_factory=dict, sa_column=Column(JSON))
     
     # Relationships
     user: "User" = Relationship(back_populates="conversations")

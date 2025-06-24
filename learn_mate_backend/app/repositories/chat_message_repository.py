@@ -27,7 +27,7 @@ class ChatMessageRepository:
         role: MessageRole,
         content: str,
         thinking: Optional[str] = None,
-        metadata: Optional[dict] = None
+        metadata_json: Optional[dict] = None
     ) -> ChatMessage:
         """Create a new chat message.
         
@@ -51,7 +51,7 @@ class ChatMessageRepository:
                 content=content,
                 thinking=thinking,
                 message_index=message_index,
-                metadata=metadata or {}
+                metadata_json=metadata_json or {}
             )
             
             self.session.add(message)
@@ -143,7 +143,7 @@ class ChatMessageRepository:
                     content=msg_data['content'],
                     thinking=msg_data.get('thinking'),
                     message_index=message_index,
-                    metadata=msg_data.get('metadata', {})
+                    metadata_json=msg_data.get('metadata_json', {})
                 )
                 
                 self.session.add(message)

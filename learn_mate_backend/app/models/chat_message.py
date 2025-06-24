@@ -55,7 +55,7 @@ class ChatMessage(BaseModel, table=True):
         default_factory=lambda: datetime.now(UTC),
         index=True
     )
-    metadata: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    metadata_json: dict = Field(default_factory=dict, sa_column=Column(JSON))
     
     # Relationships
     conversation: "Conversation" = Relationship(back_populates="messages")

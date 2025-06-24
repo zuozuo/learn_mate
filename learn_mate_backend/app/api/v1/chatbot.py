@@ -15,18 +15,22 @@ from fastapi import (
 )
 from fastapi.responses import StreamingResponse
 from app.core.metrics import llm_stream_duration_seconds
-from app.api.v1.auth import get_current_session
+from app.api.v1.auth import get_current_session, get_current_user
 from app.core.config import settings
 from app.core.langgraph.graph import LangGraphAgent
 from app.core.limiter import limiter
 from app.core.logging import logger
 from app.models.session import Session
+from app.models.user import User
 from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
     Message,
     StreamResponse,
 )
+from app.services.database import database_service
+from app.services.enhanced_chat_service import EnhancedChatService
+from sqlmodel import Session as DBSession
 
 router = APIRouter()
 agent = LangGraphAgent()
@@ -39,13 +43,17 @@ async def chat(
     request: Request,
     chat_request: ChatRequest,
     session: Session = Depends(get_current_session),
+    current_user: User = Depends(get_current_user),
 ):
-    """Process a chat request using LangGraph.
+    """Process a chat request using LangGraph (backward compatibility).
+    
+    This endpoint creates a temporary conversation for each request.
 
     Args:
         request: The FastAPI request object for rate limiting.
         chat_request: The chat request containing messages.
         session: The current session from the auth token.
+        current_user: The current authenticated user.
 
     Returns:
         ChatResponse: The processed chat response.
@@ -60,15 +68,36 @@ async def chat(
             message_count=len(chat_request.messages),
         )
 
-       
+        # Extract the last user message
+        user_message = None
+        for msg in reversed(chat_request.messages):
+            if msg.role == "user":
+                user_message = msg.content
+                break
+        
+        if not user_message:
+            raise HTTPException(status_code=400, detail="No user message found")
 
-        result = await agent.get_response(
-            chat_request.messages, session.id, user_id=session.user_id
-        )
+        # Create temporary conversation and process
+        with DBSession(database_service.engine) as db_session:
+            service = EnhancedChatService(db_session)
+            
+            # Create temporary conversation
+            conversation_id = await service.create_temporary_conversation(
+                user_id=current_user.id,
+                first_message=user_message
+            )
+            
+            # Get response (message already saved)
+            result = await agent.get_response(
+                chat_request.messages, session.id, user_id=session.user_id
+            )
 
-        logger.info("chat_request_processed", session_id=session.id)
+            logger.info("chat_request_processed", 
+                       session_id=session.id,
+                       conversation_id=str(conversation_id))
 
-        return ChatResponse(messages=result)
+            return ChatResponse(messages=result)
     except Exception as e:
         logger.error("chat_request_failed", session_id=session.id, error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -80,13 +109,17 @@ async def chat_stream(
     request: Request,
     chat_request: ChatRequest,
     session: Session = Depends(get_current_session),
+    current_user: User = Depends(get_current_user),
 ):
-    """Process a chat request using LangGraph with streaming response.
+    """Process a chat request using LangGraph with streaming response (backward compatibility).
+    
+    This endpoint creates a temporary conversation for each request.
 
     Args:
         request: The FastAPI request object for rate limiting.
         chat_request: The chat request containing messages.
         session: The current session from the auth token.
+        current_user: The current authenticated user.
 
     Returns:
         StreamingResponse: A streaming response of the chat completion.
