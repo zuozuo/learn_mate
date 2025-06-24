@@ -169,6 +169,7 @@ const NewTab = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [useStream, setUseStream] = useState(true);
   const [thinkingContent, setThinkingContent] = useState('');
   const [showThinking, setShowThinking] = useState(false);
@@ -646,8 +647,9 @@ const NewTab = () => {
       {/* 左侧边栏 */}
       <div
         className={cn(
-          'fixed left-0 top-0 flex h-full w-64 flex-col border-r',
+          'fixed left-0 top-0 flex h-full flex-col border-r transition-all duration-300',
           isLight ? 'border-gray-200 bg-gray-50' : 'border-gray-800 bg-gray-900',
+          isSidebarCollapsed ? 'w-0 overflow-hidden' : 'w-64',
         )}>
         {/* 顶部标题 */}
         <div className="border-b border-inherit p-4">
@@ -697,34 +699,8 @@ const NewTab = () => {
             </div>
           )}
 
-          {/* 功能按钮 */}
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setUseStream(!useStream)}
-              className={cn(
-                'flex-1 rounded px-2 py-1 text-xs font-medium transition-colors',
-                useStream
-                  ? isLight
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-blue-500/20 text-blue-400'
-                  : isLight
-                    ? 'bg-gray-100 text-gray-600'
-                    : 'bg-gray-800 text-gray-400',
-              )}>
-              {useStream ? '流式' : '普通'}
-            </button>
-
-            <button
-              onClick={clearChat}
-              disabled={isLoading}
-              className={cn(
-                'flex-1 rounded px-2 py-1 text-xs font-medium transition-colors',
-                isLight ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-gray-800 text-gray-400 hover:bg-gray-700',
-                'disabled:cursor-not-allowed disabled:opacity-50',
-              )}>
-              清空
-            </button>
-
+          {/* 主题切换按钮 */}
+          <div className="flex justify-center">
             <ToggleButton onClick={exampleThemeStorage.toggle} className="p-1">
               <span className="text-lg">{isLight ? '🌙' : '☀️'}</span>
             </ToggleButton>
@@ -732,8 +708,25 @@ const NewTab = () => {
         </div>
       </div>
 
+      {/* 侧边栏切换按钮 */}
+      <button
+        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        className={cn(
+          'fixed top-4 z-50 flex h-10 w-10 items-center justify-center rounded-full border transition-all duration-300',
+          isLight ? 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50' : 'border-gray-700 bg-gray-900 text-gray-400 hover:bg-gray-800',
+          isSidebarCollapsed ? 'left-4' : 'left-72',
+        )}>
+        <svg
+          className={cn('h-5 w-5 transition-transform duration-300', isSidebarCollapsed ? 'rotate-180' : '')}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+
       {/* 主内容区域 */}
-      <div className="ml-64 flex min-h-screen flex-col">
+      <div className={cn('flex min-h-screen flex-col transition-all duration-300', isSidebarCollapsed ? 'ml-0' : 'ml-64')}>
         {messages.length === 0 ? (
           /* 欢迎界面 */
           <div className="flex flex-1 flex-col items-center justify-center px-8">
@@ -847,10 +840,10 @@ const NewTab = () => {
           </div>
         ) : (
           /* 聊天界面 */
-          <div className="flex flex-1 flex-col">
+          <div className="flex h-screen flex-col">
             {/* 消息列表 */}
             <div className="flex-1 overflow-y-auto">
-              <div className="mx-auto max-w-4xl px-8 py-8">
+              <div className="mx-auto max-w-4xl px-8 py-8 pb-20">
                 {messages.map((message, index) => {
                   const isLastMessage = index === messages.length - 1;
                   const messageThinking = isLastMessage && thinkingContent ? thinkingContent : message.thinking;
