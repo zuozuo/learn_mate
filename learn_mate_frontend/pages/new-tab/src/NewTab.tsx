@@ -7,6 +7,8 @@ import { cn, ErrorDisplay, LoadingSpinner, ToggleButton } from '@extension/ui';
 import { useState, useRef, useEffect } from 'react';
 import { apiService, type Message as ApiMessage } from './services/api';
 import { authService, type User } from './services/auth';
+import { conversationService, type ConversationDetail } from './services/conversation';
+import { ConversationList } from './components/ConversationList';
 
 // 扩展Message类型以包含thinking内容
 interface Message extends ApiMessage {
@@ -166,6 +168,11 @@ const NewTab = () => {
   const [isThinkingExpanded, setIsThinkingExpanded] = useState(true);
   const [copiedMessageId, setCopiedMessageId] = useState<number | null>(null);
   const [expandedThinkingIds, setExpandedThinkingIds] = useState<Set<number>>(new Set());
+  
+  // 会话管理状态
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const streamParserRef = useRef<StreamParser | null>(null);
@@ -218,25 +225,6 @@ const NewTab = () => {
         }
         
         setUser(currentUser);
-
-        // 5. 加载聊天历史
-        if (currentUser && connected) {
-          try {
-            const history = await apiService.getChatHistory();
-            const messages = history.map((msg, index) => ({ ...msg, timestamp: new Date() }));
-            setMessages(messages);
-            // 初始化展开所有有thinking内容的消息
-            const expandedIds = new Set<number>();
-            messages.forEach((msg, index) => {
-              if (msg.thinking) {
-                expandedIds.add(index);
-              }
-            });
-            setExpandedThinkingIds(expandedIds);
-          } catch (error) {
-            console.error('Failed to load chat history:', error);
-          }
-        }
       } catch (error) {
         console.error('App initialization failed:', error);
       } finally {
@@ -260,9 +248,74 @@ const NewTab = () => {
     return () => clearInterval(interval);
   }, [isInitializing]);
 
+  // 会话管理函数
+  const loadConversation = async (conversationId: string) => {
+    try {
+      setIsLoading(true);
+      const conversation = await conversationService.getConversation(conversationId);
+      
+      // 转换消息格式
+      const convertedMessages: Message[] = conversation.messages.map((msg, index) => ({
+        role: msg.role,
+        content: msg.content,
+        thinking: msg.thinking,
+        timestamp: new Date(msg.created_at),
+      }));
+      
+      setMessages(convertedMessages);
+      setCurrentConversationId(conversationId);
+      
+      // 恢复thinking展开状态
+      const expandedIds = new Set<number>();
+      convertedMessages.forEach((msg, index) => {
+        if (msg.thinking) {
+          expandedIds.add(index);
+        }
+      });
+      setExpandedThinkingIds(expandedIds);
+      
+    } catch (error) {
+      console.error('Failed to load conversation:', error);
+      alert('Failed to load conversation');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const createNewConversation = async () => {
+    try {
+      setIsCreatingConversation(true);
+      const conversation = await conversationService.createConversation({});
+      setCurrentConversationId(conversation.id);
+      setMessages([]);
+      setExpandedThinkingIds(new Set());
+    } catch (error) {
+      console.error('Failed to create conversation:', error);
+      alert('Failed to create conversation');
+    } finally {
+      setIsCreatingConversation(false);
+    }
+  };
+
   // 发送消息
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading || !isConnected || !user) return;
+
+    // 如果没有当前会话，创建一个新会话
+    let conversationId = currentConversationId;
+    if (!conversationId) {
+      try {
+        const conversation = await conversationService.createConversation({
+          first_message: inputMessage.trim()
+        });
+        conversationId = conversation.id;
+        setCurrentConversationId(conversationId);
+      } catch (error) {
+        console.error('Failed to create conversation:', error);
+        alert('Failed to create conversation');
+        return;
+      }
+    }
 
     const userMessage: Message = {
       role: 'user',
@@ -298,8 +351,9 @@ const NewTab = () => {
         setIsThinking(true);
         setIsThinkingExpanded(true); // 默认展开
         
-        await apiService.sendMessageStream(
-          allMessages,
+        await conversationService.sendMessageStream(
+          conversationId,
+          userMessage.content,
           // 统一的chunk处理函数
           (chunk: string) => {
             console.log(`🔥 Received raw chunk from API:`, JSON.stringify(chunk));
@@ -417,16 +471,19 @@ const NewTab = () => {
         );
       } else {
         // 使用普通响应
-        const response = await apiService.sendMessage(allMessages);
-        const assistantMessages = response.messages.filter(msg => msg.role === 'assistant');
+        const response = await conversationService.sendMessage(conversationId, userMessage.content);
         
-        if (assistantMessages.length > 0) {
-          const newMessages = assistantMessages.map(msg => ({
-            ...msg,
-            timestamp: new Date()
-          }));
-          setMessages(prev => [...prev, ...newMessages]);
-        }
+        // 更新最后一条assistant消息
+        setMessages(prev => {
+          const newMessages = [...prev];
+          const lastMessage = newMessages[newMessages.length - 1];
+          if (lastMessage.role === 'assistant') {
+            lastMessage.content = response.content;
+            lastMessage.thinking = response.thinking;
+          }
+          return newMessages;
+        });
+        
         setIsLoading(false);
       }
     } catch (error) {
@@ -609,12 +666,13 @@ const NewTab = () => {
           </div>
         </div>
 
-        {/* 聊天历史占位符 */}
-        <div className="flex-1 p-4">
-          <div className={cn('text-sm', isLight ? 'text-gray-500' : 'text-gray-400')}>
-            聊天记录
-          </div>
-        </div>
+        {/* 会话列表 */}
+        <ConversationList
+          currentConversationId={currentConversationId}
+          onSelectConversation={loadConversation}
+          onCreateConversation={createNewConversation}
+          isLight={isLight}
+        />
 
         {/* 底部设置 */}
         <div className="p-4 border-t border-inherit space-y-3">
