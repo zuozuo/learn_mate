@@ -1,5 +1,25 @@
 # User Requirements History
 
+## 2025-06-24 - 后端实现完成
+
+### 需求：实现多会话管理和历史记录功能 - 后端部分
+- 已完成内容：
+  1. 创建数据库模型
+     - Conversation模型：存储会话元信息
+     - ChatMessage模型：存储消息，包含thinking字段
+     - 添加数据库触发器自动更新updated_at
+  2. 实现Repository层
+     - ConversationRepository：处理会话CRUD操作
+     - ChatMessageRepository：处理消息存储和查询
+  3. 实现Service层
+     - ConversationService：会话业务逻辑
+     - EnhancedChatService：集成聊天与会话管理
+  4. 实现API endpoints
+     - /api/v1/conversations：会话管理endpoints
+     - /api/v1/conversations/{id}/messages：消息发送endpoints
+     - 更新现有chatbot API支持向后兼容
+- 下一步：前端实现
+
 ## 2025-06-24
 
 ### 需求：实现多会话管理和历史记录功能
