@@ -816,7 +816,7 @@ const NewTab = () => {
                                     
                                     {/* Content */}
                                     <div className={cn(
-                                      'px-4 pb-4 text-sm leading-relaxed animate-fadeIn thinking-content',
+                                      'px-4 pb-6 text-sm leading-relaxed animate-fadeIn thinking-content',
                                       isLight ? 'text-gray-700' : 'text-gray-300 dark'
                                     )}>
                                       {formatContent(thinkingContent)}
