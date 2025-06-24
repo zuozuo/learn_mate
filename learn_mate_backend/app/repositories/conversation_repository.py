@@ -62,7 +62,7 @@ class ConversationRepository:
         """
         try:
             # Base query
-            query = select(Conversation).where(and_(Conversation.user_id == user_id, Conversation.is_deleted == False))
+            query = select(Conversation).where(and_(Conversation.user_id == user_id, ~Conversation.is_deleted))
 
             # Add search filter if provided
             if search:
@@ -100,7 +100,7 @@ class ConversationRepository:
                     and_(
                         Conversation.id == conversation_id,
                         Conversation.user_id == user_id,
-                        Conversation.is_deleted == False,
+                        ~Conversation.is_deleted,
                     )
                 )
             ).first()
@@ -125,7 +125,7 @@ class ConversationRepository:
             user_id: ID of the user (for authorization)
             title: New title (optional)
             summary: New summary (optional)
-            metadata: New metadata (optional)
+            metadata_json: New metadata (optional)
 
         Returns:
             Updated conversation if found and authorized, None otherwise

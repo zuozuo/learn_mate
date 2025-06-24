@@ -118,7 +118,7 @@ export interface User {
 export const authService = new AuthService();
 
 // 导出 getAuthHeaders 函数供其他模块使用
-export async function getAuthHeaders(): Promise<Record<string, string>> {
+export const getAuthHeaders = async (): Promise<Record<string, string>> => {
   const token = authService.getToken();
   if (!token) {
     throw new Error('No authentication token found');
@@ -126,4 +126,4 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
   return {
     Authorization: `Bearer ${token}`,
   };
-}
+};

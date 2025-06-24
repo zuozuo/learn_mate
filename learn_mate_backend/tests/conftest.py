@@ -30,6 +30,7 @@ sys.modules["langgraph.types"] = MagicMock()
 
 # Mock add_messages function
 def mock_add_messages(existing, new):
+    """Mock add_messages function."""
     return existing + new
 
 
@@ -38,19 +39,26 @@ sys.modules["langgraph.graph.message"].add_messages = mock_add_messages
 
 # Mock the ChatOllama class
 class MockChatOllama:
+    """Mock ChatOllama class for testing."""
+
     def __init__(self, *args, **kwargs):
+        """Initialize mock ChatOllama."""
         pass
 
     def bind_tools(self, tools):
+        """Mock bind_tools method."""
         return self
 
     async def ainvoke(self, *args, **kwargs):
+        """Mock async invoke method."""
         return MagicMock(content="Test response")
 
     def invoke(self, *args, **kwargs):
+        """Mock invoke method."""
         return MagicMock(content="Test response")
 
     async def astream(self, *args, **kwargs):
+        """Mock async stream method."""
         # Mock streaming responses
         chunks = [
             MagicMock(content="This "),
@@ -69,10 +77,14 @@ sys.modules["langchain_openai"].ChatOpenAI = MockChatOllama  # Use same mock for
 
 # Create a mock AsyncPostgresSaver
 class MockAsyncPostgresSaver:
+    """Mock AsyncPostgresSaver for testing."""
+
     def __init__(self, *args, **kwargs):
+        """Initialize mock AsyncPostgresSaver."""
         pass
 
     async def setup(self):
+        """Mock setup method."""
         pass
 
 
@@ -84,180 +96,98 @@ sys.modules["psycopg_pool"] = MagicMock()
 
 
 class MockAsyncConnectionPool:
+    """Mock AsyncConnectionPool for testing."""
+
     def __init__(self, *args, **kwargs):
+        """Initialize mock AsyncConnectionPool."""
         pass
 
     async def connection(self):
+        """Mock connection method."""
         return MagicMock()
 
     async def close(self):
+        """Mock close method."""
         pass
 
     async def open(self):
+        """Mock open method."""
         pass
 
 
 sys.modules["psycopg_pool"].AsyncConnectionPool = MockAsyncConnectionPool
 
-from app.main import app
-from app.services.database import database_service
-from app.models.user import User
-from app.models.conversation import Conversation
-from app.models.chat_message import ChatMessage, MessageRole
-from app.utils.auth import create_access_token
+# Import app modules after mocks are set up
+from app.main import app  # noqa: E402
+from app.services.database import database_service  # noqa: E402
+from app.models.user import User  # noqa: E402
+from app.models.conversation import Conversation  # noqa: E402
+from app.models.chat_message import ChatMessage, MessageRole  # noqa: E402
+from app.utils.auth import create_access_token  # noqa: E402
 
 
 # Create in-memory SQLite database for testing
-@pytest.fixture(name="engine", scope="function")
-def engine_fixture():
-    """Create a test database engine for each test."""
-    engine = create_engine(
-        "sqlite:///:memory:",  # In-memory database
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
+TEST_DATABASE_URL = "sqlite:///:memory:"
+engine = create_engine(
+    TEST_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+
+
+@pytest.fixture(scope="function")
+def session() -> Generator[Session, None, None]:
+    """Create a new database session for each test."""
     SQLModel.metadata.create_all(engine)
-    yield engine
-    engine.dispose()
-
-
-@pytest.fixture(name="session")
-def session_fixture(engine) -> Generator[Session, None, None]:
-    """Create a test database session."""
-    # Use autocommit mode to avoid transaction isolation issues in tests
-    with Session(engine, autocommit=False, autoflush=False) as session:
+    with Session(engine) as session:
         yield session
+    SQLModel.metadata.drop_all(engine)
 
 
-@pytest.fixture(name="client")
-def client_fixture(session: Session, monkeypatch) -> Generator[TestClient, None, None]:
-    """Create a test client with overridden dependencies."""
-    # Mock database service methods
-    monkeypatch.setattr(database_service, "engine", session.bind)
-
-    # Disable triggers for test database
-    monkeypatch.setattr(database_service, "_create_triggers", lambda: None)
+@pytest.fixture(scope="function")
+def client(session: Session) -> Generator[TestClient, None, None]:
+    """Create a test client with the test database session."""
 
     def get_session_override():
         return session
 
-    # Override the database session
-    old_get_session_maker = database_service.get_session_maker
-    database_service.get_session_maker = get_session_override
+    database_service.engine = engine
+    app.dependency_overrides[database_service.get_session] = get_session_override
 
-    # Mock the auth module's db_service instance methods
-    import app.api.v1.auth
+    with TestClient(app) as test_client:
+        yield test_client
 
-    auth_db_service = app.api.v1.auth.db_service
-
-    # Replace auth module's db_service engine with test engine
-    monkeypatch.setattr(auth_db_service, "engine", session.bind)
-
-    # Mock async methods to use test session
-    async def mock_get_user_by_email(email):
-        from app.models.user import User
-
-        stmt = select(User).where(User.email == email)
-        result = session.exec(stmt)
-        return result.first()
-
-    async def mock_create_user(email, password):
-        from app.models.user import User
-
-        user = User(email=email, hashed_password=password)
-        session.add(user)
-        session.commit()
-        session.refresh(user)
-        return user
-
-    async def mock_get_user(user_id):
-        from app.models.user import User
-
-        return session.get(User, user_id)
-
-    monkeypatch.setattr(auth_db_service, "get_user_by_email", mock_get_user_by_email)
-    monkeypatch.setattr(auth_db_service, "create_user", mock_create_user)
-    monkeypatch.setattr(auth_db_service, "get_user", mock_get_user)
-
-    # Mock the LangGraph agent initialization
-    import app.core.langgraph.graph
-
-    # Create a mock LangGraphAgent class
-    class MockLangGraphAgent:
-        def __init__(self):
-            self.llm = MockChatOllama()
-            self.llm_with_tools = MockChatOllama()
-            self.tools_by_name = {}
-            self._connection_pool = None
-            self._graph = None
-
-        async def _get_connection_pool(self):
-            return MockAsyncConnectionPool()
-
-        async def create_graph(self):
-            # Return a proper mock graph
-            mock_graph = MagicMock()
-
-            async def mock_ainvoke(*args, **kwargs):
-                return {"messages": [{"role": "assistant", "content": "Test response"}]}
-
-            mock_graph.ainvoke = mock_ainvoke
-            return mock_graph
-
-        async def get_response(self, messages, session_id, user_id):
-            # Ensure graph is created
-            if not self._graph:
-                self._graph = await self.create_graph()
-
-            # Invoke the graph
-            result = await self._graph.ainvoke(
-                {"messages": messages}, config={"configurable": {"thread_id": session_id}}
-            )
-
-            return result.get("messages", [{"role": "assistant", "content": "Test response"}])
-
-        async def get_stream_response(self, messages, session_id, user_id):
-            chunks = ["This ", "is ", "a ", "test ", "response"]
-            for chunk in chunks:
-                yield chunk
-
-    # Replace the LangGraphAgent class
-    monkeypatch.setattr(app.core.langgraph.graph, "LangGraphAgent", MockLangGraphAgent)
-
-    from app.main import app as fastapi_app
-
-    client = TestClient(fastapi_app)
-    yield client
-
-    # Restore
-    database_service.get_session_maker = old_get_session_maker
-    # Clear any overrides if the app instance has them
-    if hasattr(fastapi_app, "dependency_overrides"):
-        fastapi_app.dependency_overrides.clear()
+    app.dependency_overrides.clear()
 
 
-@pytest.fixture(name="test_user")
-def test_user_fixture(session: Session) -> User:
+@pytest.fixture
+def test_user(session: Session) -> User:
     """Create a test user."""
-    user = User(email="test@example.com", hashed_password=User.hash_password("testpassword123"))
+    user = User(
+        username="testuser",
+        email="test@example.com",
+        hashed_password="$2b$12$test_hashed_password",
+        is_active=True,
+        is_verified=True,
+    )
     session.add(user)
     session.commit()
     session.refresh(user)
     return user
 
 
-@pytest.fixture(name="auth_headers")
-def auth_headers_fixture(test_user: User) -> dict:
-    """Create authentication headers for test user."""
-    token = create_access_token(str(test_user.id))
-    return {"Authorization": f"Bearer {token.access_token}"}
+@pytest.fixture
+def auth_headers(test_user: User) -> dict:
+    """Create authentication headers for the test user."""
+    token = create_access_token(data={"sub": str(test_user.id)})
+    return {"Authorization": f"Bearer {token}"}
 
 
-@pytest.fixture(name="test_conversation")
-def test_conversation_fixture(session: Session, test_user: User) -> Conversation:
+@pytest.fixture
+def test_conversation(session: Session, test_user: User) -> Conversation:
     """Create a test conversation."""
     conversation = Conversation(
-        user_id=test_user.id, title="Test Conversation", summary="A test conversation for unit tests"
+        user_id=test_user.id, title="Test Conversation", summary="Test summary", metadata_json={"test": "data"}
     )
     session.add(conversation)
     session.commit()
@@ -265,80 +195,32 @@ def test_conversation_fixture(session: Session, test_user: User) -> Conversation
     return conversation
 
 
-@pytest.fixture(name="test_messages")
-def test_messages_fixture(session: Session, test_conversation: Conversation) -> list[ChatMessage]:
-    """Create test messages in a conversation."""
-    messages = [
-        ChatMessage(
-            conversation_id=test_conversation.id, role=MessageRole.USER, content="Hello, how are you?", message_index=0
-        ),
-        ChatMessage(
+@pytest.fixture
+def test_messages(session: Session, test_conversation: Conversation) -> list[ChatMessage]:
+    """Create test messages."""
+    messages = []
+    for i, (role, content) in enumerate(
+        [
+            (MessageRole.USER, "Hello, how are you?"),
+            (MessageRole.ASSISTANT, "I'm doing well, thank you! How can I help you today?"),
+            (MessageRole.USER, "What's the weather like?"),
+            (MessageRole.ASSISTANT, "I'm sorry, I don't have access to weather information."),
+        ]
+    ):
+        message = ChatMessage(
             conversation_id=test_conversation.id,
-            role=MessageRole.ASSISTANT,
-            content="I'm doing well, thank you! How can I help you today?",
-            thinking="<think>The user is greeting me. I should respond politely.</think>",
-            message_index=1,
-        ),
-        ChatMessage(
-            conversation_id=test_conversation.id,
-            role=MessageRole.USER,
-            content="Can you explain Python decorators?",
-            message_index=2,
-        ),
-    ]
-
-    for message in messages:
+            role=role,
+            content=content,
+            message_index=i,
+            created_at=datetime.now(UTC),
+        )
         session.add(message)
+        messages.append(message)
 
     session.commit()
-
-    for message in messages:
-        session.refresh(message)
-
     return messages
 
 
-@pytest.fixture(name="mock_langgraph_agent")
-def mock_langgraph_agent_fixture(monkeypatch):
-    """Mock the LangGraph agent for testing."""
-    mock_agent = MagicMock()
-
-    # Mock get_response method
-    async def mock_get_response(messages, session_id, user_id):
-        return [{"role": "assistant", "content": "This is a test response"}]
-
-    # Mock get_stream_response method
-    async def mock_get_stream_response(messages, session_id, user_id):
-        chunks = ["This ", "is ", "a ", "streaming ", "test ", "response"]
-        for chunk in chunks:
-            yield chunk
-
-    mock_agent.get_response = AsyncMock(side_effect=mock_get_response)
-    mock_agent.get_stream_response = mock_get_stream_response
-
-    # Patch the agent in the modules that use it
-    monkeypatch.setattr("app.api.v1.chatbot.agent", mock_agent)
-    monkeypatch.setattr("app.services.enhanced_chat_service.LangGraphAgent", lambda: mock_agent)
-
-    return mock_agent
-
-
-@pytest.fixture(name="mock_conversation_service")
-def mock_conversation_service_fixture(monkeypatch):
-    """Mock the conversation service for isolated testing."""
-    mock_service = MagicMock()
-
-    # Mock methods as needed
-    mock_service.create_conversation = AsyncMock(
-        return_value=Conversation(
-            id=uuid4(), user_id=1, title="New Conversation", created_at=datetime.now(UTC), updated_at=datetime.now(UTC)
-        )
-    )
-
-    return mock_service
-
-
-# Event loop fixture for async tests
 @pytest.fixture(scope="session")
 def event_loop():
     """Create an instance of the default event loop for the test session."""
@@ -347,14 +229,67 @@ def event_loop():
     loop.close()
 
 
+# Mock LangGraph service
+@pytest.fixture
+def mock_langgraph_service():
+    """Mock the LangGraph service."""
+    with patch("app.api.routes.chat.langgraph_service") as mock:
+        # Mock the get_stream_response method to return an async generator
+        async def mock_stream():
+            responses = ["This ", "is ", "a ", "test ", "response."]
+            for response in responses:
+                yield response
+
+        mock.get_stream_response.return_value = mock_stream()
+        mock.process_conversation.return_value = AsyncMock(return_value="Test response")
+        yield mock
+
+
+# Mock database service methods
+@pytest.fixture
+def mock_db_session():
+    """Mock database session."""
+    with patch("app.services.database.database_service.get_session") as mock:
+        session_mock = MagicMock()
+        session_mock.__enter__ = MagicMock(return_value=session_mock)
+        session_mock.__exit__ = MagicMock(return_value=None)
+        mock.return_value = session_mock
+        yield session_mock
+
+
 # Test data fixtures
+@pytest.fixture
+def sample_user_data():
+    """Sample user data for testing."""
+    return {"username": "newuser", "email": "newuser@example.com", "password": "StrongPassword123!"}
+
+
 @pytest.fixture
 def sample_conversation_data():
     """Sample conversation data for testing."""
-    return {"title": "Sample Conversation", "first_message": "Hello, this is a test message"}
+    return {"title": "New Conversation", "metadata": {"source": "test"}}
 
 
 @pytest.fixture
 def sample_message_data():
     """Sample message data for testing."""
-    return {"messages": [{"role": "user", "content": "What is Python?"}]}
+    return {"role": "user", "content": "Hello, this is a test message"}
+
+
+# Mock external services
+@pytest.fixture
+def mock_ollama():
+    """Mock Ollama service."""
+    with patch("app.core.langgraph.graph.ollama") as mock:
+        mock.generate.return_value = {"response": "Test response from Ollama"}
+        yield mock
+
+
+@pytest.fixture
+def mock_openai():
+    """Mock OpenAI service."""
+    with patch("app.core.langgraph.graph.ChatOpenAI") as mock:
+        instance = MagicMock()
+        instance.ainvoke.return_value = MagicMock(content="Test response from OpenAI")
+        mock.return_value = instance
+        yield mock

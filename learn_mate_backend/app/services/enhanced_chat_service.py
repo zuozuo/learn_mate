@@ -71,7 +71,7 @@ class EnhancedChatService:
         # Check if there's thinking content in the response
         # This would need to be extracted from the response format
 
-        ai_message = await self.conversation_service.add_message(
+        await self.conversation_service.add_message(
             conversation_id=conversation_id,
             user_id=user_id,
             role=MessageRole.ASSISTANT,
@@ -114,16 +114,12 @@ class EnhancedChatService:
         session_id = str(conversation_id)  # Use conversation ID as session ID
         accumulated_content = ""
         thinking_content = ""
-        in_thinking = False
 
         async for chunk in self.agent.get_stream_response(messages, session_id, str(user_id)):
             accumulated_content += chunk
 
             # Parse for thinking tags
-            if "<think>" in chunk:
-                in_thinking = True
-            elif "</think>" in chunk:
-                in_thinking = False
+            if "<think>" in chunk and "</think>" in chunk:
                 # Extract thinking content
                 if "<think>" in accumulated_content and "</think>" in accumulated_content:
                     start = accumulated_content.find("<think>") + 7

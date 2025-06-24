@@ -172,14 +172,12 @@ const NewTab = () => {
   const [useStream, setUseStream] = useState(true);
   const [thinkingContent, setThinkingContent] = useState('');
   const [showThinking, setShowThinking] = useState(false);
-  const [isThinking, setIsThinking] = useState(false);
   const [isThinkingExpanded, setIsThinkingExpanded] = useState(true);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [expandedThinkingIds, setExpandedThinkingIds] = useState<Set<number>>(new Set());
 
   // 会话管理状态
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
-  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -291,7 +289,6 @@ const NewTab = () => {
 
   const createNewConversation = async () => {
     try {
-      setIsCreatingConversation(true);
       const conversation = await conversationService.createConversation({});
       setCurrentConversationId(conversation.id);
       setMessages([]);
@@ -299,8 +296,6 @@ const NewTab = () => {
     } catch (error) {
       console.error('Failed to create conversation:', error);
       alert('Failed to create conversation');
-    } finally {
-      setIsCreatingConversation(false);
     }
   };
 
@@ -361,89 +356,86 @@ const NewTab = () => {
             userMessage.content,
             // 统一的chunk处理函数
             (chunk: string) => {
-            console.log(`🔥 Received raw chunk from API:`, JSON.stringify(chunk));
-            const parsed = streamParserRef.current!.processChunk(chunk);
+              console.log(`🔥 Received raw chunk from API:`, JSON.stringify(chunk));
+              const parsed = streamParserRef.current!.processChunk(chunk);
 
-            // 处理thinking内容
-            if (parsed.thinking) {
-              console.log(`🧠 UI: Processing thinking content:`, JSON.stringify(parsed.thinking));
-              if (!showThinking) {
-                console.log(`👁️ UI: Showing thinking panel for first time`);
-                setShowThinking(true);
-                setIsThinking(true);
-              }
-              setThinkingContent(prev => {
-                // 如果是第一次添加内容，去除开头的空白
-                if (!prev && parsed.thinking) {
-                  const trimmed = parsed.thinking.trimStart();
-                  console.log(`🧠 UI: First thinking content (trimmed): ${trimmed.length} chars`);
-                  thinkingContentRef.current = trimmed;
-                  return trimmed;
+              // 处理thinking内容
+              if (parsed.thinking) {
+                console.log(`🧠 UI: Processing thinking content:`, JSON.stringify(parsed.thinking));
+                if (!showThinking) {
+                  console.log(`👁️ UI: Showing thinking panel for first time`);
+                  setShowThinking(true);
                 }
-                const newContent = prev + parsed.thinking;
-                console.log(`🧠 UI: Updated thinking content length: ${newContent.length}`);
-                thinkingContentRef.current = newContent;
-                return newContent;
-              });
-            }
-
-            // thinking完成时停止thinking状态并自动收起
-            if (parsed.thinkingComplete) {
-              console.log(`✅ UI: Thinking phase completed, switching to response mode`);
-              setIsThinking(false);
-              // 自动收起thinking卡片
-              setTimeout(() => {
-                setIsThinkingExpanded(false);
-              }, 500); // 延迟500ms收起，让用户能看到完整的thinking内容
-
-              // 将thinking内容保存到assistant消息中
-              setMessages(prev => {
-                const newMessages = [...prev];
-                const lastMessage = newMessages[newMessages.length - 1];
-                if (lastMessage.role === 'assistant') {
-                  lastMessage.thinking = thinkingContentRef.current;
-                }
-                return newMessages;
-              });
-            }
-
-            // 处理response内容
-            if (parsed.response) {
-              console.log(`💬 UI: Processing response content:`, JSON.stringify(parsed.response));
-              // 更新现有的assistant消息
-              console.log(`🔄 UI: Updating existing assistant message`);
-              setMessages(prev => {
-                const newMessages = [...prev];
-                const lastMessage = newMessages[newMessages.length - 1];
-                if (lastMessage.role === 'assistant') {
-                  // 如果是第一次添加response内容，去除开头的空白
-                  if (!lastMessage.content && parsed.response) {
-                    const trimmed = parsed.response.trimStart();
-                    console.log(`💬 UI: First response content (trimmed): ${trimmed.length} chars`);
-                    lastMessage.content = trimmed;
-                  } else {
-                    const newContent = lastMessage.content + parsed.response;
-                    console.log(`💬 UI: Updated response content length: ${newContent.length}`);
-                    lastMessage.content = newContent;
+                setThinkingContent(prev => {
+                  // 如果是第一次添加内容，去除开头的空白
+                  if (!prev && parsed.thinking) {
+                    const trimmed = parsed.thinking.trimStart();
+                    console.log(`🧠 UI: First thinking content (trimmed): ${trimmed.length} chars`);
+                    thinkingContentRef.current = trimmed;
+                    return trimmed;
                   }
-                }
-                return newMessages;
-              });
-            }
-          },
-        );
+                  const newContent = prev + parsed.thinking;
+                  console.log(`🧠 UI: Updated thinking content length: ${newContent.length}`);
+                  thinkingContentRef.current = newContent;
+                  return newContent;
+                });
+              }
 
-        console.log(`✅ Stream completed successfully`);
-        const finalContent = streamParserRef.current?.getContent();
-        console.log(`📊 Final stream statistics:`, {
-          thinkingLength: finalContent?.thinking.length || 0,
-          responseLength: finalContent?.response.length || 0,
-        });
-        setIsLoading(false);
-        setIsThinking(false);
+              // thinking完成时停止thinking状态并自动收起
+              if (parsed.thinkingComplete) {
+                console.log(`✅ UI: Thinking phase completed, switching to response mode`);
+                // 自动收起thinking卡片
+                setTimeout(() => {
+                  setIsThinkingExpanded(false);
+                }, 500); // 延迟500ms收起，让用户能看到完整的thinking内容
 
-        // 刷新会话列表以更新消息计数
-        conversationListRef.current?.refresh();
+                // 将thinking内容保存到assistant消息中
+                setMessages(prev => {
+                  const newMessages = [...prev];
+                  const lastMessage = newMessages[newMessages.length - 1];
+                  if (lastMessage.role === 'assistant') {
+                    lastMessage.thinking = thinkingContentRef.current;
+                  }
+                  return newMessages;
+                });
+              }
+
+              // 处理response内容
+              if (parsed.response) {
+                console.log(`💬 UI: Processing response content:`, JSON.stringify(parsed.response));
+                // 更新现有的assistant消息
+                console.log(`🔄 UI: Updating existing assistant message`);
+                setMessages(prev => {
+                  const newMessages = [...prev];
+                  const lastMessage = newMessages[newMessages.length - 1];
+                  if (lastMessage.role === 'assistant') {
+                    // 如果是第一次添加response内容，去除开头的空白
+                    if (!lastMessage.content && parsed.response) {
+                      const trimmed = parsed.response.trimStart();
+                      console.log(`💬 UI: First response content (trimmed): ${trimmed.length} chars`);
+                      lastMessage.content = trimmed;
+                    } else {
+                      const newContent = lastMessage.content + parsed.response;
+                      console.log(`💬 UI: Updated response content length: ${newContent.length}`);
+                      lastMessage.content = newContent;
+                    }
+                  }
+                  return newMessages;
+                });
+              }
+            },
+          );
+
+          console.log(`✅ Stream completed successfully`);
+          const finalContent = streamParserRef.current?.getContent();
+          console.log(`📊 Final stream statistics:`, {
+            thinkingLength: finalContent?.thinking.length || 0,
+            responseLength: finalContent?.response.length || 0,
+          });
+          setIsLoading(false);
+
+          // 刷新会话列表以更新消息计数
+          conversationListRef.current?.refresh();
         } catch (error) {
           console.error('❌ Stream error:', error);
           console.log(`📊 Error state statistics:`, {
@@ -451,7 +443,6 @@ const NewTab = () => {
             parseState: streamParserRef.current ? 'exists' : 'null',
           });
           setIsLoading(false);
-          setIsThinking(false);
 
           // 如果还没有添加助手消息，先添加一个错误消息
           if (messages[messages.length - 1]?.role !== 'assistant') {
@@ -607,7 +598,6 @@ const NewTab = () => {
       setThinkingContent('');
       thinkingContentRef.current = '';
       setShowThinking(false);
-      setIsThinking(false);
       setIsThinkingExpanded(true); // 重置为默认展开
       setExpandedThinkingIds(new Set());
       if (streamParserRef.current) {
@@ -620,7 +610,6 @@ const NewTab = () => {
       setThinkingContent('');
       thinkingContentRef.current = '';
       setShowThinking(false);
-      setIsThinking(false);
       setIsThinkingExpanded(true); // 重置为默认展开
       setExpandedThinkingIds(new Set());
       if (streamParserRef.current) {
@@ -643,7 +632,7 @@ const NewTab = () => {
               🎓
             </div>
           </div>
-          <LoadingSpinner size="lg" />
+          <LoadingSpinner size={100} />
           <p className={cn('mt-4 text-lg font-medium', isLight ? 'text-gray-900' : 'text-gray-100')}>
             正在初始化 Learn Mate...
           </p>
@@ -808,7 +797,7 @@ const NewTab = () => {
                     'disabled:cursor-not-allowed',
                   )}>
                   {isLoading ? (
-                    <LoadingSpinner size="sm" />
+                    <LoadingSpinner size={50} />
                   ) : (
                     <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
@@ -1069,7 +1058,7 @@ const NewTab = () => {
                                     isLight ? 'text-gray-500 hover:text-gray-700' : 'text-gray-400 hover:text-gray-200',
                                   )}
                                   title="复制">
-                                  {copiedMessageId === index ? (
+                                  {copiedMessageId === String(index) ? (
                                     <>
                                       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path
@@ -1139,7 +1128,6 @@ const NewTab = () => {
                                       streamParserRef.current = new StreamParser();
                                       setThinkingContent('');
                                       setShowThinking(true);
-                                      setIsThinking(true);
                                       setIsThinkingExpanded(true);
 
                                       // 发送流式请求
@@ -1159,7 +1147,6 @@ const NewTab = () => {
                                           }
 
                                           if (parsed.thinkingComplete) {
-                                            setIsThinking(false);
                                             setTimeout(() => {
                                               setIsThinkingExpanded(false);
                                             }, 500);
@@ -1183,12 +1170,10 @@ const NewTab = () => {
                                         },
                                         () => {
                                           setIsLoading(false);
-                                          setIsThinking(false);
                                         },
                                         (error: Error) => {
                                           console.error('Stream error:', error);
                                           setIsLoading(false);
-                                          setIsThinking(false);
                                         },
                                       );
                                     }
@@ -1272,7 +1257,7 @@ const NewTab = () => {
                       'disabled:cursor-not-allowed',
                     )}>
                     {isLoading ? (
-                      <LoadingSpinner size="sm" />
+                      <LoadingSpinner size={50} />
                     ) : (
                       <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""验证流式响应修复效果"""
+"""验证流式响应修复效果."""
 
 import asyncio
 from app.core.langgraph.graph import LangGraphAgent
@@ -7,7 +7,7 @@ from app.schemas import Message
 
 
 async def verify_fix():
-    """验证bind_tools问题的修复"""
+    """验证bind_tools问题的修复."""
     print("=== 验证流式响应修复 ===\n")
 
     agent = LangGraphAgent()

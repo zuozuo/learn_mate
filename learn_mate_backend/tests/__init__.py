@@ -1,1 +1,1 @@
-# Tests package
+"""Tests package for Learn Mate Backend."""

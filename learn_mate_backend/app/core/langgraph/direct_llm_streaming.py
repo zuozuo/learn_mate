@@ -17,6 +17,7 @@ async def get_direct_stream_response(
     3. Manually saves to chat history afterward
 
     Args:
+        self: The instance of the class
         messages: The messages to send to the LLM
         session_id: The session ID for the conversation
         user_id: The user ID for the conversation

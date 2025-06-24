@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""最终测试：验证前后端流式响应效果"""
+"""最终测试：验证前后端流式响应效果."""
 
 import asyncio
 from app.core.langgraph.graph import LangGraphAgent
@@ -7,7 +7,7 @@ from app.schemas import Message
 
 
 async def test_streaming():
-    """测试流式响应，模拟前端行为"""
+    """测试流式响应，模拟前端行为."""
     print("=== 测试前后端流式响应效果 ===\n")
 
     agent = LangGraphAgent()

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""测试流式响应的chunk数量"""
+"""测试流式响应的chunk数量."""
 
 import asyncio
 import aiohttp
@@ -7,7 +7,7 @@ import json
 
 
 async def test_streaming():
-    """测试API的流式响应质量"""
+    """测试API的流式响应质量."""
     base_url = "http://localhost:8000"
 
     async with aiohttp.ClientSession() as session:

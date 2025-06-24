@@ -36,7 +36,7 @@ class ChatMessageRepository:
             role: Message role (user/assistant/system)
             content: Message content
             thinking: AI thinking content (optional)
-            metadata: Additional metadata (optional)
+            metadata_json: Additional metadata (optional)
 
         Returns:
             Created message

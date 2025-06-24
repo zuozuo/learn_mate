@@ -16,6 +16,7 @@ async def get_stream_response_enhanced(
     bundled the entire response.
 
     Args:
+        self: The instance of the class.
         messages: The messages to send to the LLM.
         session_id: The session ID for the conversation.
         user_id: The user ID for the conversation.

@@ -31,6 +31,8 @@ class ConversationResponse(BaseModel):
     message_count: Optional[int] = None
 
     class Config:
+        """Pydantic configuration."""
+
         from_attributes = True
 
 
@@ -44,6 +46,8 @@ class MessageResponse(BaseModel):
     created_at: datetime
 
     class Config:
+        """Pydantic configuration."""
+
         from_attributes = True
 
 
@@ -58,6 +62,8 @@ class ConversationDetailResponse(BaseModel):
     messages: List[MessageResponse]
 
     class Config:
+        """Pydantic configuration."""
+
         from_attributes = True
 
 
