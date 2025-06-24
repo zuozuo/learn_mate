@@ -20,3 +20,12 @@
   1. 移除formatContent中的Tailwind类名（mb-2 last:mb-0）
   2. 删除全局code样式避免冲突
   3. 使用更高特异性的CSS选择器
+
+### 需求：实现thinking内容的持久化存储
+- 问题分析：刷新后thinking"样式失效"实际是thinking内容本身丢失了
+- 根本原因：Message接口只有role和content字段，thinking内容未被保存
+- 解决方案：
+  1. 扩展Message类型添加thinking字段
+  2. 在thinking完成时将内容保存到message对象
+  3. 从message对象读取thinking内容渲染
+  4. 为每个消息维护独立的展开/折叠状态

@@ -1,23 +1,24 @@
 # Latest User Requirements
 
-## 当前需求：彻底修复thinking样式刷新失效问题
+## 当前需求：实现thinking内容的持久化存储
 
 ### 问题描述
-- 正常发送消息和点击重试时样式正常
-- 刷新整个页面后thinking样式丢失
-
-### 问题分析
-1. formatContent函数中仍有Tailwind类名会覆盖SCSS样式
-2. 全局code样式与thinking内容的code样式冲突
-3. CSS加载顺序导致SCSS样式被Tailwind覆盖
+- 刷新后thinking"样式失效"实际是thinking内容本身丢失了
+- 根本原因：后端API的Message接口只有role和content字段
+- thinking内容只存在于React状态中，未被持久化
 
 ### 解决方案
-1. 移除formatContent中所有Tailwind类名
-2. 删除NewTab.css中的全局code样式
-3. 在SCSS中使用更高特异性的选择器和必要的!important
+1. 前端扩展Message类型添加thinking字段
+2. 在thinking完成时将内容保存到message对象
+3. 从message对象读取thinking内容进行渲染
+4. 为每个消息维护独立的展开/折叠状态
 
 ### TODO List
-- [x] 移除formatContent中的Tailwind类名
-- [x] 删除全局code样式
-- [x] 优化SCSS选择器特异性
-- [x] 测试刷新后样式是否正常
+- [x] 扩展Message类型
+- [x] 实现thinking内容保存逻辑
+- [x] 修改渲染逻辑从message读取thinking
+- [x] 实现独立的展开/折叠状态管理
+
+### 遗留问题
+- 后端API需要支持thinking字段的保存和返回
+- 或考虑使用本地存储（localStorage）作为临时方案

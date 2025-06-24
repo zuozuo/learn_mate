@@ -5,8 +5,14 @@ import { useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
 import { exampleThemeStorage } from '@extension/storage';
 import { cn, ErrorDisplay, LoadingSpinner, ToggleButton } from '@extension/ui';
 import { useState, useRef, useEffect } from 'react';
-import { apiService, type Message } from './services/api';
+import { apiService, type Message as ApiMessage } from './services/api';
 import { authService, type User } from './services/auth';
+
+// 扩展Message类型以包含thinking内容
+interface Message extends ApiMessage {
+  thinking?: string;
+  timestamp?: Date;
+}
 
 // Stream Parser for handling <think> tags
 class StreamParser {
@@ -159,9 +165,11 @@ const NewTab = () => {
   const [showThinking, setShowThinking] = useState(false);
   const [isThinkingExpanded, setIsThinkingExpanded] = useState(true);
   const [copiedMessageId, setCopiedMessageId] = useState<number | null>(null);
+  const [expandedThinkingIds, setExpandedThinkingIds] = useState<Set<number>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const streamParserRef = useRef<StreamParser | null>(null);
+  const thinkingContentRef = useRef<string>('');
 
   // 获取问候语
   const getGreeting = () => {
@@ -215,7 +223,16 @@ const NewTab = () => {
         if (currentUser && connected) {
           try {
             const history = await apiService.getChatHistory();
-            setMessages(history.map(msg => ({ ...msg, timestamp: new Date() })));
+            const messages = history.map((msg, index) => ({ ...msg, timestamp: new Date() }));
+            setMessages(messages);
+            // 初始化展开所有有thinking内容的消息
+            const expandedIds = new Set<number>();
+            messages.forEach((msg, index) => {
+              if (msg.thinking) {
+                expandedIds.add(index);
+              }
+            });
+            setExpandedThinkingIds(expandedIds);
           } catch (error) {
             console.error('Failed to load chat history:', error);
           }
@@ -276,6 +293,7 @@ const NewTab = () => {
         
         // 重置状态并立即显示thinking
         setThinkingContent('');
+        thinkingContentRef.current = '';
         setShowThinking(true);
         setIsThinking(true);
         setIsThinkingExpanded(true); // 默认展开
@@ -300,10 +318,12 @@ const NewTab = () => {
                 if (!prev && parsed.thinking) {
                   const trimmed = parsed.thinking.trimStart();
                   console.log(`🧠 UI: First thinking content (trimmed): ${trimmed.length} chars`);
+                  thinkingContentRef.current = trimmed;
                   return trimmed;
                 }
                 const newContent = prev + parsed.thinking;
                 console.log(`🧠 UI: Updated thinking content length: ${newContent.length}`);
+                thinkingContentRef.current = newContent;
                 return newContent;
               });
             }
@@ -316,6 +336,16 @@ const NewTab = () => {
               setTimeout(() => {
                 setIsThinkingExpanded(false);
               }, 500); // 延迟500ms收起，让用户能看到完整的thinking内容
+              
+              // 将thinking内容保存到assistant消息中
+              setMessages(prev => {
+                const newMessages = [...prev];
+                const lastMessage = newMessages[newMessages.length - 1];
+                if (lastMessage.role === 'assistant') {
+                  lastMessage.thinking = thinkingContentRef.current;
+                }
+                return newMessages;
+              });
             }
             
             // 处理response内容
@@ -511,9 +541,11 @@ const NewTab = () => {
       setMessages([]);
       // 清空thinking相关状态
       setThinkingContent('');
+      thinkingContentRef.current = '';
       setShowThinking(false);
       setIsThinking(false);
       setIsThinkingExpanded(true); // 重置为默认展开
+      setExpandedThinkingIds(new Set());
       if (streamParserRef.current) {
         streamParserRef.current.reset();
       }
@@ -522,9 +554,11 @@ const NewTab = () => {
       // 即使清空失败，也清空本地消息
       setMessages([]);
       setThinkingContent('');
+      thinkingContentRef.current = '';
       setShowThinking(false);
       setIsThinking(false);
       setIsThinkingExpanded(true); // 重置为默认展开
+      setExpandedThinkingIds(new Set());
       if (streamParserRef.current) {
         streamParserRef.current.reset();
       }
@@ -746,6 +780,8 @@ const NewTab = () => {
                 {messages.map((message, index) => {
                   const isLastMessage = index === messages.length - 1;
                   const isAssistantMessage = message.role === 'assistant';
+                  const messageThinking = isLastMessage && thinkingContent ? thinkingContent : message.thinking;
+                  const isExpanded = isLastMessage ? isThinkingExpanded : expandedThinkingIds.has(index);
                   
                   return (
                     <div key={index} className={cn("mb-4", isLastMessage && "mb-0")}>
@@ -775,7 +811,7 @@ const NewTab = () => {
                         /* Assistant消息 - 无头像，简化设计 */
                         <div>
                           {/* Thinking 卡片 - 在response上方 */}
-                          {isLastMessage && thinkingContent && (
+                          {messageThinking && (
                             <div className={cn(
                               'rounded-lg border overflow-hidden transition-all duration-200 mb-4',
                               isLight 
@@ -784,13 +820,27 @@ const NewTab = () => {
                             )}>
                               <div className={cn(
                                 'transition-all duration-300 ease-in-out',
-                                isThinkingExpanded ? 'max-h-[500px]' : 'max-h-[60px]'
+                                isExpanded ? 'max-h-[500px]' : 'max-h-[60px]'
                               )}>
-                                {isThinkingExpanded ? (
+                                {isExpanded ? (
                                   <>
                                     {/* Header - 只在展开时显示，整个header可点击 */}
                                     <button
-                                      onClick={() => setIsThinkingExpanded(!isThinkingExpanded)}
+                                      onClick={() => {
+                                        if (isLastMessage) {
+                                          setIsThinkingExpanded(!isThinkingExpanded);
+                                        } else {
+                                          setExpandedThinkingIds(prev => {
+                                            const newSet = new Set(prev);
+                                            if (newSet.has(index)) {
+                                              newSet.delete(index);
+                                            } else {
+                                              newSet.add(index);
+                                            }
+                                            return newSet;
+                                          });
+                                        }
+                                      }}
                                       className={cn(
                                         'w-full px-4 py-2 flex items-center justify-between animate-fadeIn',
                                         'hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors'
@@ -809,7 +859,7 @@ const NewTab = () => {
                                         )}>
                                           1s
                                         </span>
-                                        <svg className={cn('w-5 h-5 transition-transform duration-300', isThinkingExpanded && 'rotate-180')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className={cn('w-5 h-5 transition-transform duration-300', isExpanded && 'rotate-180')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                         </svg>
                                       </div>
@@ -820,13 +870,23 @@ const NewTab = () => {
                                       'px-4 pb-6 text-sm leading-relaxed animate-fadeIn thinking-content',
                                       isLight ? 'text-gray-700' : 'text-gray-300 dark'
                                     )}>
-                                      {formatContent(thinkingContent)}
+                                      {formatContent(messageThinking)}
                                     </div>
                                   </>
                                 ) : (
                                   /* Collapsed content - 无header，可点击整个区域展开 */
                                   <button
-                                    onClick={() => setIsThinkingExpanded(true)}
+                                    onClick={() => {
+                                      if (isLastMessage) {
+                                        setIsThinkingExpanded(true);
+                                      } else {
+                                        setExpandedThinkingIds(prev => {
+                                          const newSet = new Set(prev);
+                                          newSet.add(index);
+                                          return newSet;
+                                        });
+                                      }
+                                    }}
                                     className={cn(
                                       'w-full text-left px-4 py-3 flex items-center justify-between group',
                                       'hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all duration-200'
@@ -838,10 +898,10 @@ const NewTab = () => {
                                     )}>
                                       {(() => {
                                         // 获取第一句话（到句号、感叹号或问号为止）
-                                        const firstSentence = thinkingContent.match(/^[^.!?。！？]+[.!?。！？]/)?.[0] || thinkingContent.split('\n')[0] || thinkingContent;
+                                        const firstSentence = messageThinking.match(/^[^.!?。！？]+[.!?。！？]/)?.[0] || messageThinking.split('\n')[0] || messageThinking;
                                         // 限制最大长度为100个字符
                                         const truncated = firstSentence.length > 100 ? firstSentence.substring(0, 100) : firstSentence;
-                                        return truncated.length < thinkingContent.length 
+                                        return truncated.length < messageThinking.length 
                                           ? truncated + '...' 
                                           : truncated;
                                       })()}
@@ -930,6 +990,7 @@ const NewTab = () => {
                                       setMessages(messages.slice(0, lastUserMessageIndex));
                                       // 清空thinking内容
                                       setThinkingContent('');
+                                      thinkingContentRef.current = '';
                                       setShowThinking(false);
                                       // 直接使用最后的用户消息内容发送，不需要设置inputMessage
                                       const lastUserMessageContent = messages[lastUserMessageIndex].content;
