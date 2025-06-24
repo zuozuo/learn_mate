@@ -8,7 +8,7 @@ import { useState, useRef, useEffect } from 'react';
 import { apiService, type Message as ApiMessage } from './services/api';
 import { authService, type User } from './services/auth';
 import { conversationService, type ConversationDetail } from './services/conversation';
-import { ConversationList } from './components/ConversationList';
+import { ConversationList, type ConversationListRef } from './components/ConversationList';
 
 // 扩展Message类型以包含thinking内容
 interface Message extends ApiMessage {
@@ -177,6 +177,7 @@ const NewTab = () => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const streamParserRef = useRef<StreamParser | null>(null);
   const thinkingContentRef = useRef<string>('');
+  const conversationListRef = useRef<ConversationListRef>(null);
 
   // 获取问候语
   const getGreeting = () => {
@@ -436,6 +437,9 @@ const NewTab = () => {
             });
             setIsLoading(false);
             setIsThinking(false);
+            
+            // 刷新会话列表以更新消息计数
+            conversationListRef.current?.refresh();
           },
           (error: Error) => {
             console.error('❌ Stream error:', error);
@@ -485,6 +489,9 @@ const NewTab = () => {
         });
         
         setIsLoading(false);
+        
+        // 刷新会话列表以更新消息计数
+        conversationListRef.current?.refresh();
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -668,6 +675,7 @@ const NewTab = () => {
 
         {/* 会话列表 */}
         <ConversationList
+          ref={conversationListRef}
           currentConversationId={currentConversationId}
           onSelectConversation={loadConversation}
           onCreateConversation={createNewConversation}
