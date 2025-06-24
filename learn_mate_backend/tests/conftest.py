@@ -124,6 +124,36 @@ def client_fixture(session: Session, monkeypatch) -> Generator[TestClient, None,
     old_get_session_maker = database_service.get_session_maker
     database_service.get_session_maker = get_session_override
     
+    # Mock the auth module's db_service instance methods
+    import app.api.v1.auth
+    auth_db_service = app.api.v1.auth.db_service
+    
+    # Replace auth module's db_service engine with test engine
+    monkeypatch.setattr(auth_db_service, "engine", session.bind)
+    
+    # Mock async methods to use test session
+    async def mock_get_user_by_email(email):
+        from app.models.user import User
+        stmt = select(User).where(User.email == email)
+        result = session.exec(stmt)
+        return result.first()
+    
+    async def mock_create_user(email, password):
+        from app.models.user import User
+        user = User(email=email, hashed_password=password)
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        return user
+    
+    async def mock_get_user(user_id):
+        from app.models.user import User
+        return session.get(User, user_id)
+    
+    monkeypatch.setattr(auth_db_service, "get_user_by_email", mock_get_user_by_email)
+    monkeypatch.setattr(auth_db_service, "create_user", mock_create_user)
+    monkeypatch.setattr(auth_db_service, "get_user", mock_get_user)
+    
     # Mock the LangGraph agent initialization
     import app.core.langgraph.graph
     
@@ -140,10 +170,31 @@ def client_fixture(session: Session, monkeypatch) -> Generator[TestClient, None,
             return MockAsyncConnectionPool()
         
         async def create_graph(self):
-            return MagicMock()
+            # Return a proper mock graph
+            mock_graph = MagicMock()
+            
+            async def mock_ainvoke(*args, **kwargs):
+                return {
+                    "messages": [
+                        {"role": "assistant", "content": "Test response"}
+                    ]
+                }
+            
+            mock_graph.ainvoke = mock_ainvoke
+            return mock_graph
         
         async def get_response(self, messages, session_id, user_id):
-            return [{"role": "assistant", "content": "Test response"}]
+            # Ensure graph is created
+            if not self._graph:
+                self._graph = await self.create_graph()
+            
+            # Invoke the graph
+            result = await self._graph.ainvoke(
+                {"messages": messages},
+                config={"configurable": {"thread_id": session_id}}
+            )
+            
+            return result.get("messages", [{"role": "assistant", "content": "Test response"}])
         
         async def get_stream_response(self, messages, session_id, user_id):
             chunks = ["This ", "is ", "a ", "test ", "response"]

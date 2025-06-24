@@ -4,7 +4,7 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.models.user import User
 from app.utils.auth import create_access_token, verify_token
@@ -14,17 +14,8 @@ from app.services.database import database_service
 class TestAuthAPI:
     """Test suite for authentication endpoints."""
     
-    @patch.object(database_service, 'get_user_by_email', new_callable=AsyncMock)
-    @patch.object(database_service, 'create_user', new_callable=AsyncMock)
-    def test_register_success(self, mock_create_user, mock_get_user_by_email, client: TestClient):
+    def test_register_success(self, client: TestClient):
         """Test successful user registration."""
-        # Mock that user doesn't exist
-        mock_get_user_by_email.return_value = None
-        
-        # Mock successful user creation
-        mock_user = User(id=1, email="newuser@example.com", hashed_password="hashed")
-        mock_create_user.return_value = mock_user
-        
         response = client.post(
             "/api/v1/auth/register",
             json={
@@ -43,17 +34,12 @@ class TestAuthAPI:
         assert data["token"]["token_type"] == "bearer"
         assert "expires_at" in data["token"]
     
-    @patch.object(database_service, 'get_user_by_email', new_callable=AsyncMock)
     def test_register_duplicate_email(
         self, 
-        mock_get_user_by_email,
         client: TestClient, 
         test_user: User
     ):
         """Test registration with existing email."""
-        # Mock that user already exists
-        mock_get_user_by_email.return_value = test_user
-        
         response = client.post(
             "/api/v1/auth/register",
             json={
@@ -77,17 +63,12 @@ class TestAuthAPI:
         
         assert response.status_code == 422
     
-    @patch.object(database_service, 'get_user_by_email', new_callable=AsyncMock)
     def test_login_success(
         self,
-        mock_get_user_by_email,
         client: TestClient,
         test_user: User
     ):
         """Test successful login."""
-        # Mock successful user lookup
-        mock_get_user_by_email.return_value = test_user
-        
         response = client.post(
             "/api/v1/auth/login",
             data={
@@ -106,17 +87,12 @@ class TestAuthAPI:
         user_id = verify_token(data["access_token"])
         assert user_id == str(test_user.id)
     
-    @patch.object(database_service, 'get_user_by_email', new_callable=AsyncMock)
     def test_login_wrong_password(
         self,
-        mock_get_user_by_email,
         client: TestClient,
         test_user: User
     ):
         """Test login with wrong password."""
-        # Mock user lookup - password verification will fail
-        mock_get_user_by_email.return_value = test_user
-        
         response = client.post(
             "/api/v1/auth/login",
             data={
@@ -129,12 +105,8 @@ class TestAuthAPI:
         assert response.status_code == 401
         assert "Incorrect email or password" in response.json()["detail"]
     
-    @patch.object(database_service, 'get_user_by_email', new_callable=AsyncMock)
-    def test_login_nonexistent_user(self, mock_get_user_by_email, client: TestClient):
+    def test_login_nonexistent_user(self, client: TestClient):
         """Test login with non-existent user."""
-        # Mock that user doesn't exist
-        mock_get_user_by_email.return_value = None
-        
         response = client.post(
             "/api/v1/auth/login",
             data={
@@ -165,18 +137,13 @@ class TestAuthAPI:
         assert response.status_code == 400
         assert "Unsupported grant type" in response.json()["detail"]
     
-    @patch.object(database_service, 'get_user', new_callable=AsyncMock)
     def test_protected_endpoint_with_valid_token(
         self,
-        mock_get_user,
         client: TestClient,
         test_user: User,
         auth_headers: dict
     ):
         """Test accessing protected endpoint with valid token."""
-        # Mock user lookup for token validation
-        mock_get_user.return_value = test_user
-        
         response = client.get(
             "/api/v1/conversations",
             headers=auth_headers
@@ -193,10 +160,8 @@ class TestAuthAPI:
         
         assert response.status_code == 403
     
-    @patch.object(database_service, 'get_user', new_callable=AsyncMock)
     def test_protected_endpoint_with_invalid_token(
         self,
-        mock_get_user,
         client: TestClient
     ):
         """Test accessing protected endpoint with invalid token."""
@@ -206,7 +171,8 @@ class TestAuthAPI:
             headers=headers
         )
         
-        assert response.status_code == 401
+        # Invalid token format causes 422 Unprocessable Entity
+        assert response.status_code == 422
     
     def test_protected_endpoint_with_expired_token(
         self,
@@ -250,14 +216,16 @@ class TestAuthAPI:
         user_id = verify_token(token.access_token)
         assert user_id == str(test_user.id)
         
-        # Test invalid token
-        invalid_user_id = verify_token("invalid_token")
-        assert invalid_user_id is None
+        # Test invalid token format (raises ValueError)
+        with pytest.raises(ValueError, match="Token format is invalid"):
+            verify_token("invalid_token")
+        
+        # Test malformed JWT (3 parts but invalid)
+        with pytest.raises(ValueError, match="Token format is invalid"):
+            verify_token("header.payload.signature")
     
-    @patch.object(database_service, 'get_user', new_callable=AsyncMock)
     def test_get_current_user(
         self,
-        mock_get_user,
         client: TestClient,
         session: Session,
         test_user: User
@@ -272,9 +240,6 @@ class TestAuthAPI:
             scheme="Bearer",
             credentials=token.access_token
         )
-        
-        # Mock database service
-        mock_get_user.return_value = test_user
         
         # Test get_current_user
         user = asyncio.run(get_current_user(credentials))

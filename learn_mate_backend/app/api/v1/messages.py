@@ -61,6 +61,9 @@ async def send_message(
                        user_id=current_user.id)
             
             return response
+    except HTTPException:
+        # Re-raise HTTPExceptions without modification
+        raise
     except ValueError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
