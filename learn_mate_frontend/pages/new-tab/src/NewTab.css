@@ -15,8 +15,4 @@
   font-size: calc(10px + 2vmin);
 }
 
-code {
-  background: rgba(148, 163, 184, 0.5);
-  border-radius: 0.25rem;
-  padding: 0.2rem 0.5rem;
-}
+/* Global code styles moved to SCSS for better scoping */

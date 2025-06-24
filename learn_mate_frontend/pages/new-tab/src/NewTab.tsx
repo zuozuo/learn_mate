@@ -448,7 +448,7 @@ const NewTab = () => {
         const code = lines.slice(1, -1).join('\n');
         
         return (
-          <pre key={index} className="mb-2 last:mb-0">
+          <pre key={index}>
             <code className={language ? `language-${language}` : ''}>
               {code}
             </code>
@@ -462,7 +462,7 @@ const NewTab = () => {
       
       if (cleanedParagraph) {
         return (
-          <p key={index} className="mb-2 last:mb-0">
+          <p key={index}>
             {cleanedParagraph}
           </p>
         );
