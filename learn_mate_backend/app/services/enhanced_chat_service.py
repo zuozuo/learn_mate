@@ -117,22 +117,16 @@ class EnhancedChatService:
 
         async for chunk in self.agent.get_stream_response(messages, session_id, str(user_id)):
             accumulated_content += chunk
-
-            # Parse for thinking tags
-            if "<think>" in chunk and "</think>" in chunk:
-                # Extract thinking content
-                if "<think>" in accumulated_content and "</think>" in accumulated_content:
-                    start = accumulated_content.find("<think>") + 7
-                    end = accumulated_content.find("</think>")
-                    thinking_content = accumulated_content[start:end]
-
             yield chunk
 
-        # Save complete assistant message after streaming
-        # Extract clean content without thinking tags
+        # Extract thinking content after streaming completes
         clean_content = accumulated_content
-        if thinking_content:
-            clean_content = accumulated_content.replace(f"<think>{thinking_content}</think>", "").strip()
+        if "<think>" in accumulated_content and "</think>" in accumulated_content:
+            start = accumulated_content.find("<think>")
+            end = accumulated_content.find("</think>") + 8  # Include </think> tag
+            thinking_part = accumulated_content[start:end]
+            thinking_content = accumulated_content[start + 7 : end - 8]  # Extract content without tags
+            clean_content = accumulated_content.replace(thinking_part, "").strip()
 
         await self.conversation_service.add_message(
             conversation_id=conversation_id,

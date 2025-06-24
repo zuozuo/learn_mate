@@ -16,15 +16,16 @@ class TestAuthAPI:
 
     def test_register_success(self, client: TestClient):
         """Test successful user registration."""
-        response = client.post(
-            "/api/v1/auth/register", json={"email": "newuser@example.com", "password": "SecurePass123!"}
-        )
+        import time
+
+        unique_email = f"newuser_{int(time.time())}@example.com"
+        response = client.post("/api/v1/auth/register", json={"email": unique_email, "password": "SecurePass123!"})
 
         assert response.status_code == 200
         data = response.json()
         assert "id" in data
         assert "email" in data
-        assert data["email"] == "newuser@example.com"
+        assert data["email"] == unique_email
         assert "token" in data
         assert "access_token" in data["token"]
         assert data["token"]["token_type"] == "bearer"
@@ -45,9 +46,19 @@ class TestAuthAPI:
 
     def test_login_success(self, client: TestClient, test_user: User):
         """Test successful login."""
+        # First, create a user using the register endpoint to ensure it's in the right database
+        import time
+
+        unique_email = f"logintest_{int(time.time())}@example.com"
+        register_response = client.post(
+            "/api/v1/auth/register", json={"email": unique_email, "password": "TestPassword123!"}
+        )
+        assert register_response.status_code == 200
+
+        # Now test login with the newly created user
         response = client.post(
             "/api/v1/auth/login",
-            data={"username": test_user.email, "password": "testpassword123", "grant_type": "password"},
+            data={"username": unique_email, "password": "TestPassword123!", "grant_type": "password"},
         )
 
         assert response.status_code == 200
@@ -55,9 +66,9 @@ class TestAuthAPI:
         assert "access_token" in data
         assert data["token_type"] == "bearer"
 
-        # Verify token is valid
+        # Verify token is valid (should match the newly created user)
         user_id = verify_token(data["access_token"])
-        assert user_id == str(test_user.id)
+        assert user_id == str(register_response.json()["id"])
 
     def test_login_wrong_password(self, client: TestClient, test_user: User):
         """Test login with wrong password."""
@@ -150,12 +161,55 @@ class TestAuthAPI:
         from app.api.v1.auth import get_current_user
         from fastapi.security import HTTPAuthorizationCredentials
 
-        # Create valid credentials
-        token = create_access_token(str(test_user.id))
-        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token.access_token)
+        # Mock the database service get_user method
+        with patch("app.api.v1.auth.db_service.get_user") as mock_get_user:
+            # Make it return a coroutine that returns the test_user
+            async def mock_async_get_user(user_id):
+                return test_user
 
-        # Test get_current_user
-        user = asyncio.run(get_current_user(credentials))
+            mock_get_user.side_effect = mock_async_get_user
 
-        assert user.id == test_user.id
-        assert user.email == test_user.email
+            # Create valid credentials
+            token = create_access_token(str(test_user.id))
+            credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token.access_token)
+
+            # Test get_current_user
+            user = asyncio.run(get_current_user(credentials))
+
+            assert user.id == test_user.id
+            assert user.email == test_user.email
+
+    def test_get_current_user_with_session_token(self, client: TestClient, session: Session, test_user: User):
+        """Test get_current_user with session token (UUID)."""
+        from app.api.v1.auth import get_current_user
+        from fastapi.security import HTTPAuthorizationCredentials
+        from app.models.session import Session as ChatSession
+        import uuid
+
+        # Create a mock session
+        session_id = str(uuid.uuid4())
+        mock_session = ChatSession(id=session_id, user_id=test_user.id, name="Test Session")
+
+        # Mock the database service methods
+        with patch("app.api.v1.auth.db_service.get_session") as mock_get_session, \
+             patch("app.api.v1.auth.db_service.get_user") as mock_get_user:
+            
+            # Make them return coroutines
+            async def mock_async_get_session(sid):
+                return mock_session if sid == session_id else None
+
+            async def mock_async_get_user(uid):
+                return test_user if uid == test_user.id else None
+
+            mock_get_session.side_effect = mock_async_get_session
+            mock_get_user.side_effect = mock_async_get_user
+
+            # Create token with session ID (UUID)
+            token = create_access_token(session_id)
+            credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token.access_token)
+
+            # Test get_current_user with session token
+            user = asyncio.run(get_current_user(credentials))
+
+            assert user.id == test_user.id
+            assert user.email == test_user.email

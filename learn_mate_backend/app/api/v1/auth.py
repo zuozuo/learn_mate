@@ -64,8 +64,8 @@ async def get_current_user(
         # Sanitize token
         token = sanitize_string(credentials.credentials)
 
-        user_id = verify_token(token)
-        if user_id is None:
+        token_value = verify_token(token)
+        if token_value is None:
             logger.error("invalid_token", token_part=token[:10] + "...")
             raise HTTPException(
                 status_code=401,
@@ -73,18 +73,41 @@ async def get_current_user(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # Verify user exists in database
-        user_id_int = int(user_id)
-        user = await db_service.get_user(user_id_int)
-        if user is None:
-            logger.error("user_not_found", user_id=user_id_int)
-            raise HTTPException(
-                status_code=404,
-                detail="User not found",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        # Check if token_value is a UUID (session ID) or numeric (user ID)
+        try:
+            # Try to parse as UUID first
+            uuid.UUID(token_value)
+            # It's a session ID, get user from session
+            session = await db_service.get_session(token_value)
+            if session is None:
+                logger.error("session_not_found", session_id=token_value)
+                raise HTTPException(
+                    status_code=404,
+                    detail="Session not found",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            user = await db_service.get_user(session.user_id)
+            if user is None:
+                logger.error("user_not_found", user_id=session.user_id)
+                raise HTTPException(
+                    status_code=404,
+                    detail="User not found",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            return user
+        except ValueError:
+            # Not a UUID, try as numeric user ID
+            user_id_int = int(token_value)
+            user = await db_service.get_user(user_id_int)
+            if user is None:
+                logger.error("user_not_found", user_id=user_id_int)
+                raise HTTPException(
+                    status_code=404,
+                    detail="User not found",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            return user
 
-        return user
     except ValueError as ve:
         logger.error("token_validation_failed", error=str(ve), exc_info=True)
         raise HTTPException(

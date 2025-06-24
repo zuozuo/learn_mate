@@ -163,10 +163,11 @@ def client(session: Session) -> Generator[TestClient, None, None]:
 @pytest.fixture
 def test_user(session: Session) -> User:
     """Create a test user."""
+    # Create user with properly hashed password
     user = User(
         username="testuser",
         email="test@example.com",
-        hashed_password="$2b$12$test_hashed_password",
+        hashed_password=User.hash_password("testpassword123"),
         is_active=True,
         is_verified=True,
     )
@@ -179,7 +180,8 @@ def test_user(session: Session) -> User:
 @pytest.fixture
 def auth_headers(test_user: User) -> dict:
     """Create authentication headers for the test user."""
-    token = create_access_token(data={"sub": str(test_user.id)})
+    token_obj = create_access_token(thread_id=str(test_user.id))
+    token = token_obj.access_token
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -293,3 +295,32 @@ def mock_openai():
         instance.ainvoke.return_value = MagicMock(content="Test response from OpenAI")
         mock.return_value = instance
         yield mock
+
+
+@pytest.fixture
+def mock_langgraph_agent():
+    """Mock the LangGraph Agent."""
+    with patch("app.services.enhanced_chat_service.LangGraphAgent") as mock_agent_class:
+        # Create mock instance
+        mock_instance = MagicMock()
+
+        # Mock the stream response method
+        async def mock_stream():
+            responses = ["This ", "is ", "a ", "test ", "response."]
+            for response in responses:
+                yield response
+
+        mock_instance.get_stream_response.return_value = mock_stream()
+
+        # Mock the get_response method for non-streaming calls
+        async def mock_get_response(*args, **kwargs):
+            return [{"role": "assistant", "content": "This is a test response"}]
+
+        mock_instance.get_response = AsyncMock(
+            return_value=[{"role": "assistant", "content": "This is a test response"}]
+        )
+
+        # Make the class return our mock instance
+        mock_agent_class.return_value = mock_instance
+
+        yield mock_instance

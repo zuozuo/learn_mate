@@ -1,49 +1,34 @@
 # Latest User Requirements
 
-## 当前需求：实现多会话管理和历史记录功能 - 前端部分
+## 当前需求：修复 Chrome Extension 创建对话失败问题
 
 ### 需求描述
-基于已完成的后端API，实现前端界面：
-1. 左侧显示会话列表
-2. 支持创建新会话
-3. 支持切换会话
-4. 支持删除会话
-5. 在聊天区域显示当前会话的消息
-6. 支持在任意会话中继续对话
+Chrome 扩展在创建对话时失败，错误信息显示 "Failed to create conversation"，后端日志显示 token 验证失败：
+```
+ValueError: invalid literal for int() with base 10: 'c4a6515b-c2e2-4121-97da-6b85afbcf8d3'
+```
 
-### 后端已完成内容
-1. **数据库模型**
-   - conversations表：存储会话元信息
-   - chat_messages表：存储具体消息，包含thinking字段
-   
-2. **API endpoints**
-   - GET /api/v1/conversations - 获取会话列表
-   - POST /api/v1/conversations - 创建新会话
-   - GET /api/v1/conversations/{id} - 获取会话详情
-   - PATCH /api/v1/conversations/{id} - 更新会话标题
-   - DELETE /api/v1/conversations/{id} - 删除会话
-   - POST /api/v1/conversations/{id}/messages - 发送消息
-   - POST /api/v1/conversations/{id}/messages/stream - 流式发送消息
+### 问题分析
+1. Chrome 扩展使用会话 token（包含 UUID）调用需要用户认证的对话创建端点
+2. `get_current_user` 函数尝试将 token 中的值转换为整数，但会话 ID 是 UUID 格式
+3. 系统有两种认证方式：
+   - 用户认证：使用整数 ID
+   - 会话认证：使用 UUID
 
-### 前端TODO
-1. **UI组件开发**
-   - ConversationList组件（左侧边栏）
-   - 会话列表项组件
-   - 新建会话按钮
-   - 删除确认对话框
+### 解决方案
+修改 `get_current_user` 函数，使其能够同时处理用户 ID（整数）和会话 ID（UUID）：
+1. 首先尝试将 token 值解析为 UUID
+2. 如果是 UUID，则从会话中获取对应的用户
+3. 如果不是 UUID，则按原有逻辑处理为用户 ID
 
-2. **状态管理**
-   - 会话列表状态
-   - 当前会话ID
-   - 消息列表状态
-   - 加载状态管理
+### 实施情况
+✅ 已完成修复工作：
+- 修改了 app/api/v1/auth.py 中的 `get_current_user` 函数
+- 添加了 UUID 检测和会话查询逻辑
+- 添加了测试用例 `test_get_current_user_with_session_token`
+- 所有测试通过，代码已准备提交
 
-3. **API集成**
-   - 创建API服务层
-   - 实现会话CRUD操作
-   - 更新现有聊天逻辑支持conversation_id
-
-### 相关文档
-- 设计文档：docs/design/conversation_history_design.md
-- 实现清单：docs/design/conversation_history_todo.md
-- 需求历史：docs/user_requirements_history.md
+### 技术要点
+- 保持向后兼容性，同时支持两种 token 类型
+- 使用 try-except 块优雅处理 UUID 解析
+- 添加了完整的错误处理和日志记录

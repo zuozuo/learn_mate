@@ -1,5 +1,27 @@
 # User Requirements History
 
+## 2025-06-24 - 修复 docstring D415 错误
+
+### 需求：修复测试文件中的 docstring 格式问题
+- 需求描述：
+  1. test_final_streaming.py line 2: D415 First line should end with a period, question mark, or exclamation point
+  2. test_final_streaming.py line 10: D415 First line should end with a period, question mark, or exclamation point
+  3. test_streaming_chunks.py line 2: D415 First line should end with a period, question mark, or exclamation point
+  4. test_streaming_chunks.py line 10: D415 First line should end with a period, question mark, or exclamation point
+- 解决方案：在 docstring 的第一行末尾添加句号
+- 实施情况：
+  1. 修复了 test_final_streaming.py 中的 2 个 docstring
+  2. 修复了 test_streaming_chunks.py 中的 2 个 docstring
+  3. 修复了 verify_streaming_fix.py 中的 2 个 docstring（额外发现的）
+  4. 为 tests/__init__.py 添加了 docstring
+  5. 为 tests/api/__init__.py 添加了 docstring
+  6. 为 tests/api/v1/__init__.py 添加了 docstring
+- 技术要点：
+  1. Ruff linter 使用 Google docstring 规范
+  2. 中文句号（。）不被识别为有效的结束标点
+  3. 需要使用英文句号（.）来结束 docstring 的第一行
+- 结果：所有 linting 检查已通过，代码已提交
+
 ## 2025-06-24 - 后端实现完成
 
 ### 需求：实现多会话管理和历史记录功能 - 后端部分
@@ -63,3 +85,15 @@
   2. 在thinking完成时将内容保存到message对象
   3. 从message对象读取thinking内容渲染
   4. 为每个消息维护独立的展开/折叠状态
+
+## 2025-06-24
+
+### 需求：修复 docstring D415 错误
+- 用户需求：修复测试文件中的 docstring 格式问题
+- 问题：多个测试文件的 docstring 第一行未以句号结束
+- 解决方案：
+  1. 修复了 test_final_streaming.py 中的 2 个 docstring
+  2. 修复了 test_streaming_chunks.py 中的 2 个 docstring
+  3. 修复了 verify_streaming_fix.py 中的 2 个 docstring
+  4. 为所有 __init__.py 文件添加了规范的 docstring
+- 技术要点：Ruff linter 要求使用英文句号（.）结束 docstring 第一行
