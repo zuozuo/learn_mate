@@ -54,8 +54,9 @@ class TestConversationsAPI:
         
         # Verify message was created
         conversation_id = data["id"]
+        from uuid import UUID
         messages = session.query(ChatMessage).filter(
-            ChatMessage.conversation_id == conversation_id
+            ChatMessage.conversation_id == UUID(conversation_id)
         ).all()
         
         assert len(messages) == 1

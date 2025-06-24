@@ -189,61 +189,58 @@ class TestConversationFlow:
         self,
         client: TestClient,
         auth_headers: dict,
-        session: Session
+        session: Session,
+        monkeypatch
     ):
         """Test that thinking content is properly saved and retrieved."""
-        # Mock agent to return thinking content
-        from app.services.enhanced_chat_service import EnhancedChatService
+        # Create a custom mock for the LangGraph agent that returns thinking content
+        class MockLangGraphAgentWithThinking:
+            def __init__(self):
+                pass
+            
+            async def get_response(self, messages, session_id, user_id):
+                return [{
+                    "role": "assistant",
+                    "content": "The answer is 42",
+                    "thinking": "<think>Let me calculate... 6 * 7 = 42</think>"
+                }]
         
-        original_send = EnhancedChatService.send_message
+        # Patch the agent in the chatbot module
+        import app.api.v1.chatbot
+        monkeypatch.setattr(app.api.v1.chatbot, "agent", MockLangGraphAgentWithThinking())
         
-        async def mock_send_with_thinking(self, *args, **kwargs):
-            # Create a mock response with thinking
-            from app.schemas.chat import Message
-            return Message(
-                role="assistant",
-                content="The answer is 42",
-                thinking="Let me calculate... 6 * 7 = 42"
-            )
+        # Create conversation and send message
+        conv_response = client.post(
+            "/api/v1/conversations",
+            headers=auth_headers,
+            json={"title": "Thinking Test"}
+        )
+        conv_id = conv_response.json()["id"]
         
-        # Patch the method
-        EnhancedChatService.send_message = mock_send_with_thinking
+        # Send message
+        msg_response = client.post(
+            f"/api/v1/conversations/{conv_id}/messages",
+            headers=auth_headers,
+            json={"messages": [{"role": "user", "content": "What's 6 times 7?"}]}
+        )
+        assert msg_response.status_code == 200
         
-        try:
-            # Create conversation and send message
-            conv_response = client.post(
-                "/api/v1/conversations",
-                headers=auth_headers,
-                json={"title": "Thinking Test"}
-            )
-            conv_id = conv_response.json()["id"]
-            
-            # Send message (will use our mock)
-            client.post(
-                f"/api/v1/conversations/{conv_id}/messages",
-                headers=auth_headers,
-                json={"messages": [{"role": "user", "content": "What's 6 times 7?"}]}
-            )
-            
-            # Retrieve and verify thinking was saved
-            detail_response = client.get(
-                f"/api/v1/conversations/{conv_id}",
-                headers=auth_headers
-            )
-            messages = detail_response.json()["messages"]
-            
-            # Find assistant message
-            assistant_msg = next(
-                (m for m in messages if m["role"] == "assistant"),
-                None
-            )
-            
-            assert assistant_msg is not None
-            assert assistant_msg["thinking"] == "Let me calculate... 6 * 7 = 42"
-            
-        finally:
-            # Restore original method
-            EnhancedChatService.send_message = original_send
+        # Retrieve and verify thinking was saved
+        detail_response = client.get(
+            f"/api/v1/conversations/{conv_id}",
+            headers=auth_headers
+        )
+        messages = detail_response.json()["messages"]
+        
+        # Find assistant message
+        assistant_msg = next(
+            (m for m in messages if m["role"] == "assistant"),
+            None
+        )
+        
+        assert assistant_msg is not None
+        # Thinking content is extracted without tags
+        assert assistant_msg.get("thinking") == "Let me calculate... 6 * 7 = 42"
     
     @pytest.mark.integration
     def test_conversation_search_and_pagination(

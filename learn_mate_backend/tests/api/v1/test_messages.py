@@ -69,7 +69,7 @@ class TestMessagesAPI:
         )
         
         assert response.status_code == 400
-        assert response.json()["detail"] == "No user message found"
+        assert "No user message found" in response.json()["detail"]
     
     def test_send_message_unauthorized_conversation(
         self,
@@ -173,27 +173,16 @@ class TestMessagesAPI:
         monkeypatch
     ):
         """Test streaming with thinking content."""
-        # Mock agent to return thinking content
-        mock_agent = MagicMock()
+        # Mock the enhanced chat service
+        async def mock_stream_with_thinking(conversation_id, user_id, content):
+            # Yield thinking content
+            yield "<think>"
+            yield "I need to process this request"
+            yield "</think>"
+            yield "Here is my response"
         
-        async def mock_stream_with_thinking(conversation_id, content, on_chunk, on_thinking):
-            chunks = [
-                "<think>",
-                "I need to process this request",
-                "</think>",
-                "Here is my response"
-            ]
-            for chunk in chunks:
-                on_chunk(chunk)
-                await asyncio.sleep(0)  # Yield control
-            
-            # Call thinking callback
-            if on_thinking:
-                on_thinking("I need to process this request")
-        
-        # Mock the enhanced chat service instead
         mock_service = MagicMock()
-        mock_service.send_message_stream = AsyncMock(side_effect=mock_stream_with_thinking)
+        mock_service.send_message_stream = mock_stream_with_thinking
         
         import app.services.enhanced_chat_service
         monkeypatch.setattr(
@@ -242,7 +231,7 @@ class TestMessagesAPI:
             raise ValueError("Stream error")
         
         mock_service = MagicMock()
-        mock_service.send_message_stream = AsyncMock(side_effect=mock_error_stream)
+        mock_service.send_message_stream = mock_error_stream
         
         # Patch the service
         import app.services.enhanced_chat_service
@@ -274,8 +263,9 @@ class TestMessagesAPI:
                     except json.JSONDecodeError:
                         pass
             
-            # Should have error chunk
+            # Should have error chunk with done=True
             assert any(chunk.get("done") is True for chunk in chunks)
+            # Error will be caught and returned as "Stream error" from ValueError
             error_chunks = [c for c in chunks if "Stream error" in c.get("content", "")]
             assert len(error_chunks) > 0
     

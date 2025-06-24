@@ -72,6 +72,9 @@ class MockAsyncConnectionPool:
     
     async def close(self):
         pass
+    
+    async def open(self):
+        pass
 
 sys.modules['psycopg_pool'].AsyncConnectionPool = MockAsyncConnectionPool
 
