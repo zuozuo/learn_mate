@@ -9,6 +9,18 @@ NC='\033[0m' # No Color
 echo -e "${YELLOW}Running API Tests for Learn Mate Backend${NC}"
 echo "========================================"
 
+# Set test environment
+export ENVIRONMENT=test
+export ENV_FILE=.env.test
+
+# Unset proxy environment variables to avoid SOCKS proxy issues
+unset http_proxy
+unset https_proxy
+unset HTTP_PROXY
+unset HTTPS_PROXY
+unset all_proxy
+unset ALL_PROXY
+
 # Activate virtual environment if it exists
 if [ -d ".venv" ]; then
     source .venv/bin/activate
@@ -22,13 +34,16 @@ pip install -q pytest pytest-asyncio pytest-cov pytest-mock
 
 # Run different test suites
 echo -e "\n${YELLOW}Running Unit Tests...${NC}"
-pytest tests/test_repositories.py tests/test_services.py -v -m "not integration"
+PYTHONPATH=. pytest tests/test_repositories.py tests/test_services.py -v -m "not integration" --tb=short
 
 echo -e "\n${YELLOW}Running API Tests...${NC}"
-pytest tests/api/v1/ -v
+PYTHONPATH=. pytest tests/api/v1/ -v --tb=short
 
-echo -e "\n${YELLOW}Running All Tests with Coverage...${NC}"
-pytest --cov=app --cov-report=term-missing --cov-report=html
+echo -e "\n${YELLOW}Running Integration Tests...${NC}"
+PYTHONPATH=. pytest tests/test_integration.py -v --tb=short
+
+echo -e "\n${YELLOW}Running All Tests...${NC}"
+PYTHONPATH=. pytest -v --tb=short
 
 # Check if tests passed
 if [ $? -eq 0 ]; then

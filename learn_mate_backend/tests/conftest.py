@@ -2,15 +2,78 @@
 
 import asyncio
 import os
+import sys
 import pytest
 from typing import Generator, AsyncGenerator
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock, patch
 from datetime import datetime, UTC
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine, select
 from sqlalchemy.pool import StaticPool
+
+# Mock PostgreSQL dependencies before importing app
+sys.modules['psycopg'] = MagicMock()
+sys.modules['psycopg_c'] = MagicMock()
+sys.modules['langgraph.checkpoint.postgres.aio'] = MagicMock()
+
+# Mock langchain and ollama dependencies to avoid import issues
+sys.modules['langchain_ollama'] = MagicMock()
+sys.modules['ollama'] = MagicMock()
+sys.modules['langchain_openai'] = MagicMock()
+sys.modules['langgraph.graph'] = MagicMock()
+sys.modules['langgraph.graph.state'] = MagicMock()
+sys.modules['langgraph.graph.message'] = MagicMock()
+sys.modules['langgraph.types'] = MagicMock()
+
+# Mock add_messages function
+def mock_add_messages(existing, new):
+    return existing + new
+
+sys.modules['langgraph.graph.message'].add_messages = mock_add_messages
+
+# Mock the ChatOllama class
+class MockChatOllama:
+    def __init__(self, *args, **kwargs):
+        pass
+    
+    def bind_tools(self, tools):
+        return self
+    
+    async def ainvoke(self, *args, **kwargs):
+        return MagicMock(content="Test response")
+    
+    def invoke(self, *args, **kwargs):
+        return MagicMock(content="Test response")
+
+sys.modules['langchain_ollama'].ChatOllama = MockChatOllama
+sys.modules['langchain_openai'].ChatOpenAI = MockChatOllama  # Use same mock for ChatOpenAI
+
+# Create a mock AsyncPostgresSaver
+class MockAsyncPostgresSaver:
+    def __init__(self, *args, **kwargs):
+        pass
+    
+    async def setup(self):
+        pass
+
+# Replace the import
+sys.modules['langgraph.checkpoint.postgres.aio'].AsyncPostgresSaver = MockAsyncPostgresSaver
+
+# Mock psycopg_pool
+sys.modules['psycopg_pool'] = MagicMock()
+class MockAsyncConnectionPool:
+    def __init__(self, *args, **kwargs):
+        pass
+    
+    async def connection(self):
+        return MagicMock()
+    
+    async def close(self):
+        pass
+
+sys.modules['psycopg_pool'].AsyncConnectionPool = MockAsyncConnectionPool
 
 from app.main import app
 from app.services.database import database_service
@@ -21,39 +84,81 @@ from app.utils.auth import create_access_token
 
 
 # Create in-memory SQLite database for testing
-@pytest.fixture(name="engine")
+@pytest.fixture(name="engine", scope="function")
 def engine_fixture():
-    """Create a test database engine."""
+    """Create a test database engine for each test."""
     engine = create_engine(
-        "sqlite:///:memory:",
+        "sqlite:///:memory:",  # In-memory database
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
     SQLModel.metadata.create_all(engine)
-    return engine
+    yield engine
+    engine.dispose()
 
 
 @pytest.fixture(name="session")
 def session_fixture(engine) -> Generator[Session, None, None]:
     """Create a test database session."""
-    with Session(engine) as session:
+    # Use autocommit mode to avoid transaction isolation issues in tests
+    with Session(engine, autocommit=False, autoflush=False) as session:
         yield session
 
 
 @pytest.fixture(name="client")
-def client_fixture(session: Session) -> Generator[TestClient, None, None]:
+def client_fixture(session: Session, monkeypatch) -> Generator[TestClient, None, None]:
     """Create a test client with overridden dependencies."""
+    # Mock database service methods
+    monkeypatch.setattr(database_service, "engine", session.bind)
+    
+    # Disable triggers for test database
+    monkeypatch.setattr(database_service, "_create_triggers", lambda: None)
+    
     def get_session_override():
         return session
 
     # Override the database session
-    app.dependency_overrides[database_service.get_session_maker] = get_session_override
+    old_get_session_maker = database_service.get_session_maker
+    database_service.get_session_maker = get_session_override
     
-    client = TestClient(app)
+    # Mock the LangGraph agent initialization
+    import app.core.langgraph.graph
+    
+    # Create a mock LangGraphAgent class
+    class MockLangGraphAgent:
+        def __init__(self):
+            self.llm = MockChatOllama()
+            self.llm_with_tools = MockChatOllama()
+            self.tools_by_name = {}
+            self._connection_pool = None
+            self._graph = None
+        
+        async def _get_connection_pool(self):
+            return MockAsyncConnectionPool()
+        
+        async def create_graph(self):
+            return MagicMock()
+        
+        async def get_response(self, messages, session_id, user_id):
+            return [{"role": "assistant", "content": "Test response"}]
+        
+        async def get_stream_response(self, messages, session_id, user_id):
+            chunks = ["This ", "is ", "a ", "test ", "response"]
+            for chunk in chunks:
+                yield chunk
+    
+    # Replace the LangGraphAgent class
+    monkeypatch.setattr(app.core.langgraph.graph, "LangGraphAgent", MockLangGraphAgent)
+    
+    from app.main import app as fastapi_app
+    client = TestClient(fastapi_app)
     yield client
     
-    # Clear overrides
-    app.dependency_overrides.clear()
+    # Restore
+    database_service.get_session_maker = old_get_session_maker
+    # Clear any overrides if the app instance has them
+    if hasattr(fastapi_app, 'dependency_overrides'):
+        fastapi_app.dependency_overrides.clear()
 
 
 @pytest.fixture(name="test_user")

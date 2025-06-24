@@ -133,12 +133,22 @@ class ChatMessageRepository:
         try:
             created_messages = []
             
+            # Track the next index for each conversation
+            conversation_indexes = {}
+            
             for msg_data in messages:
-                # Get the next message index for this conversation
-                message_index = self._get_next_message_index(msg_data['conversation_id'])
+                conv_id = msg_data['conversation_id']
+                
+                # Initialize index for this conversation if not seen yet
+                if conv_id not in conversation_indexes:
+                    conversation_indexes[conv_id] = self._get_next_message_index(conv_id)
+                
+                # Use and increment the index
+                message_index = conversation_indexes[conv_id]
+                conversation_indexes[conv_id] += 1
                 
                 message = ChatMessage(
-                    conversation_id=msg_data['conversation_id'],
+                    conversation_id=conv_id,
                     role=msg_data['role'],
                     content=msg_data['content'],
                     thinking=msg_data.get('thinking'),
@@ -171,10 +181,11 @@ class ChatMessageRepository:
         Returns:
             Next available message index
         """
+        # Get the maximum message index from the database
         max_index = self.session.exec(
             select(func.max(ChatMessage.message_index)).where(
                 ChatMessage.conversation_id == conversation_id
             )
         ).one()
         
-        return (max_index or -1) + 1
+        return (max_index if max_index is not None else -1) + 1

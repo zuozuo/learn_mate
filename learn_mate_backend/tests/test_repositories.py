@@ -196,21 +196,30 @@ class TestConversationRepository:
     def test_get_message_count(
         self,
         session: Session,
-        test_conversation: Conversation
+        test_user: User
     ):
         """Test getting message count for a conversation."""
+        # Create a fresh conversation for this test
+        conversation = Conversation(
+            user_id=test_user.id,
+            title="Message Count Test",
+            summary="Testing message count"
+        )
+        session.add(conversation)
+        session.commit()
+        
         repo = ConversationRepository(session)
         msg_repo = ChatMessageRepository(session)
         
         # Add messages
         for i in range(3):
             msg_repo.create_message(
-                conversation_id=test_conversation.id,
+                conversation_id=conversation.id,
                 role=MessageRole.USER,
                 content=f"Message {i}"
             )
         
-        count = repo.get_message_count(test_conversation.id)
+        count = repo.get_message_count(conversation.id)
         assert count == 3
 
 
@@ -244,16 +253,25 @@ class TestChatMessageRepository:
     def test_message_index_auto_increment(
         self,
         session: Session,
-        test_conversation: Conversation
+        test_user: User
     ):
         """Test that message indexes auto-increment."""
+        # Create a fresh conversation for this test
+        conversation = Conversation(
+            user_id=test_user.id,
+            title="Auto Increment Test",
+            summary="Testing message index auto increment"
+        )
+        session.add(conversation)
+        session.commit()
+        
         repo = ChatMessageRepository(session)
         
         # Create multiple messages
         messages = []
         for i in range(5):
             msg = repo.create_message(
-                conversation_id=test_conversation.id,
+                conversation_id=conversation.id,
                 role=MessageRole.USER if i % 2 == 0 else MessageRole.ASSISTANT,
                 content=f"Message {i}"
             )
@@ -266,33 +284,42 @@ class TestChatMessageRepository:
     def test_get_messages_by_conversation(
         self,
         session: Session,
-        test_conversation: Conversation
+        test_user: User
     ):
         """Test retrieving messages for a conversation."""
+        # Create a fresh conversation for this test
+        conversation = Conversation(
+            user_id=test_user.id,
+            title="Get Messages Test",
+            summary="Testing message retrieval"
+        )
+        session.add(conversation)
+        session.commit()
+        
         repo = ChatMessageRepository(session)
         
         # Create messages
         for i in range(5):
             repo.create_message(
-                conversation_id=test_conversation.id,
+                conversation_id=conversation.id,
                 role=MessageRole.USER,
                 content=f"Message {i}"
             )
         
         # Retrieve all
-        messages = repo.get_messages_by_conversation(test_conversation.id)
+        messages = repo.get_messages_by_conversation(conversation.id)
         assert len(messages) == 5
         
         # Test with limit
         messages = repo.get_messages_by_conversation(
-            test_conversation.id,
+            conversation.id,
             limit=3
         )
         assert len(messages) == 3
         
         # Test with offset
         messages = repo.get_messages_by_conversation(
-            test_conversation.id,
+            conversation.id,
             offset=2
         )
         assert len(messages) == 3
@@ -301,25 +328,34 @@ class TestChatMessageRepository:
     def test_bulk_create_messages(
         self,
         session: Session,
-        test_conversation: Conversation
+        test_user: User
     ):
         """Test bulk creating messages."""
+        # Create a fresh conversation for this test
+        conversation = Conversation(
+            user_id=test_user.id,
+            title="Bulk Create Test",
+            summary="Testing bulk message creation"
+        )
+        session.add(conversation)
+        session.commit()
+        
         repo = ChatMessageRepository(session)
         
         messages_data = [
             {
-                "conversation_id": test_conversation.id,
+                "conversation_id": conversation.id,
                 "role": MessageRole.USER,
                 "content": "Bulk message 1"
             },
             {
-                "conversation_id": test_conversation.id,
+                "conversation_id": conversation.id,
                 "role": MessageRole.ASSISTANT,
                 "content": "Bulk response",
                 "thinking": "Bulk thinking"
             },
             {
-                "conversation_id": test_conversation.id,
+                "conversation_id": conversation.id,
                 "role": MessageRole.USER,
                 "content": "Bulk message 2"
             }

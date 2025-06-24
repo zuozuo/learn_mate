@@ -2,6 +2,7 @@
 
 import pytest
 import json
+import asyncio
 from uuid import uuid4
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
@@ -190,11 +191,16 @@ class TestMessagesAPI:
             if on_thinking:
                 on_thinking("I need to process this request")
         
-        from app.services import conversation_service as conv_service_module
+        # Mock the enhanced chat service instead
         mock_service = MagicMock()
-        mock_service.sendMessageStream = AsyncMock(side_effect=mock_stream_with_thinking)
+        mock_service.send_message_stream = AsyncMock(side_effect=mock_stream_with_thinking)
         
-        monkeypatch.setattr(conv_service_module, "conversationService", mock_service)
+        import app.services.enhanced_chat_service
+        monkeypatch.setattr(
+            app.services.enhanced_chat_service,
+            "EnhancedChatService",
+            lambda session: mock_service
+        )
         
         message_data = {
             "messages": [{"role": "user", "content": "Think about this"}]
@@ -236,7 +242,7 @@ class TestMessagesAPI:
             raise ValueError("Stream error")
         
         mock_service = MagicMock()
-        mock_service.sendMessageStream = AsyncMock(side_effect=mock_error_stream)
+        mock_service.send_message_stream = AsyncMock(side_effect=mock_error_stream)
         
         # Patch the service
         import app.services.enhanced_chat_service
@@ -310,5 +316,3 @@ class TestMessagesAPI:
             assert f"Message {i}" in msg.content
 
 
-# Import asyncio for async tests
-import asyncio
