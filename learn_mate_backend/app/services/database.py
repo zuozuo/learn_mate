@@ -13,6 +13,7 @@ from sqlmodel import (
     SQLModel,
     create_engine,
     select,
+    text,
 )
 
 from app.core.config import (
@@ -51,6 +52,9 @@ class DatabaseService:
 
             # Create tables (only if they don't exist)
             SQLModel.metadata.create_all(self.engine)
+            
+            # Create database triggers
+            self._create_triggers()
 
             logger.info(
                 "database_initialized",
@@ -63,6 +67,37 @@ class DatabaseService:
             # In production, don't raise - allow app to start even with DB issues
             if settings.ENVIRONMENT != Environment.PRODUCTION:
                 raise
+
+    def _create_triggers(self):
+        """Create database triggers for maintaining data integrity."""
+        try:
+            with Session(self.engine) as session:
+                # Read and execute trigger SQL
+                trigger_sql = """
+                -- Trigger to automatically update conversations.updated_at when a new message is added
+                CREATE OR REPLACE FUNCTION update_conversation_timestamp()
+                RETURNS TRIGGER AS $$
+                BEGIN
+                    UPDATE conversations 
+                    SET updated_at = CURRENT_TIMESTAMP 
+                    WHERE id = NEW.conversation_id;
+                    RETURN NEW;
+                END;
+                $$ LANGUAGE plpgsql;
+
+                -- Create the trigger
+                DROP TRIGGER IF EXISTS update_conversation_on_new_message ON chat_messages;
+                CREATE TRIGGER update_conversation_on_new_message
+                AFTER INSERT ON chat_messages
+                FOR EACH ROW
+                EXECUTE FUNCTION update_conversation_timestamp();
+                """
+                session.exec(text(trigger_sql))
+                session.commit()
+                logger.info("database_triggers_created")
+        except SQLAlchemyError as e:
+            # Triggers might already exist or table might not exist yet
+            logger.warning("database_triggers_creation_warning", error=str(e))
 
     async def create_user(self, email: str, password: str) -> User:
         """Create a new user.

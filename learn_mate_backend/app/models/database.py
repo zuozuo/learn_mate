@@ -1,5 +1,7 @@
 """Database models for the application."""
 
 from app.models.thread import Thread
+from app.models.conversation import Conversation
+from app.models.chat_message import ChatMessage
 
-__all__ = ["Thread"]
+__all__ = ["Thread", "Conversation", "ChatMessage"]

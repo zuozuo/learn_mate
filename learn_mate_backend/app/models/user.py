@@ -15,6 +15,7 @@ from app.models.base import BaseModel
 
 if TYPE_CHECKING:
     from app.models.session import Session
+    from app.models.conversation import Conversation
 
 
 class User(BaseModel, table=True):
@@ -32,6 +33,7 @@ class User(BaseModel, table=True):
     email: str = Field(unique=True, index=True)
     hashed_password: str
     sessions: List["Session"] = Relationship(back_populates="user")
+    conversations: List["Conversation"] = Relationship(back_populates="user")
 
     def verify_password(self, password: str) -> bool:
         """Verify if the provided password matches the hash."""
