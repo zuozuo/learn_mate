@@ -1,24 +1,31 @@
 # Latest User Requirements
 
-## 当前需求：实现thinking内容的持久化存储
+## 当前需求：实现多会话管理和历史记录功能
 
-### 问题描述
-- 刷新后thinking"样式失效"实际是thinking内容本身丢失了
-- 根本原因：后端API的Message接口只有role和content字段
-- thinking内容只存在于React状态中，未被持久化
+### 需求描述
+1. 支持历史聊天记录
+2. 每个历史聊天记录存储在postgres的conversations表里
+3. 每个conversation里面的具体对话信息存储在chat_messages表里
+4. 用户可以同时开启和维护多个conversations，每个conversations互不干扰
+5. 用户可以在界面上看到历史的聊天记录，并且可以在chatbox里面加载每个聊天记录，继续聊天
 
-### 解决方案
-1. 前端扩展Message类型添加thinking字段
-2. 在thinking完成时将内容保存到message对象
-3. 从message对象读取thinking内容进行渲染
-4. 为每个消息维护独立的展开/折叠状态
+### 设计方案
+1. **数据库设计**
+   - conversations表：存储会话元信息
+   - chat_messages表：存储具体消息，包含thinking字段
+   
+2. **API设计**
+   - 会话管理API：创建、列表、详情、更新、删除
+   - 消息API：基于conversation_id发送和接收消息
+   
+3. **前端设计**
+   - 左侧会话列表
+   - 右侧聊天区域
+   - 支持会话切换和管理
 
 ### TODO List
-- [x] 扩展Message类型
-- [x] 实现thinking内容保存逻辑
-- [x] 修改渲染逻辑从message读取thinking
-- [x] 实现独立的展开/折叠状态管理
+详见 docs/design/conversation_history_todo.md
 
-### 遗留问题
-- 后端API需要支持thinking字段的保存和返回
-- 或考虑使用本地存储（localStorage）作为临时方案
+### 相关文档
+- 设计文档：docs/design/conversation_history_design.md
+- 实现清单：docs/design/conversation_history_todo.md
