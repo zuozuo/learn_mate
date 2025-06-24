@@ -217,33 +217,42 @@ class TestEnhancedChatService:
     """Test suite for EnhancedChatService."""
     
     @pytest.mark.asyncio
-    async def test_send_message_creates_conversation(
+    async def test_send_message_success(
         self,
         session: Session,
         test_user: User,
         mock_langgraph_agent
     ):
-        """Test that sending message creates conversation if needed."""
+        """Test sending message to a conversation."""
         service = EnhancedChatService(session)
         
-        # Mock conversation service
-        with patch.object(service.conversation_service, 'add_message') as mock_add:
-            mock_add.return_value = ChatMessage(
-                id=uuid4(),
-                conversation_id=uuid4(),
-                role=MessageRole.USER,
-                content="Test",
-                message_index=0
-            )
-            
-            response = await service.send_message(
-                conversation_id=uuid4(),
-                user_id=test_user.id,
-                content="Test message"
-            )
-            
-            assert response.role == "assistant"
-            assert response.content == "This is a test response"
+        # Create a real conversation
+        conv_service = ConversationService(session)
+        conversation = await conv_service.create_conversation(
+            user_id=test_user.id,
+            title="Test Chat"
+        )
+        
+        # Mock the agent response
+        service.agent = mock_langgraph_agent
+        
+        # Send message
+        response = await service.send_message(
+            conversation_id=conversation.id,
+            user_id=test_user.id,
+            content="Test message"
+        )
+        
+        assert response.role == "assistant"
+        assert response.content == "This is a test response"
+        
+        # Verify messages were saved
+        messages = session.query(ChatMessage).filter(
+            ChatMessage.conversation_id == conversation.id
+        ).all()
+        assert len(messages) == 2  # User + Assistant
+        assert messages[0].content == "Test message"
+        assert messages[1].content == "This is a test response"
     
     @pytest.mark.asyncio
     async def test_send_message_stream_with_thinking(
@@ -266,31 +275,31 @@ class TestEnhancedChatService:
         mock_agent.get_stream_response = mock_stream
         service.agent = mock_agent
         
-        # Mock conversation service
-        with patch.object(service.conversation_service, 'add_message') as mock_add:
-            mock_add.return_value = MagicMock(id=uuid4())
-            
-            chunks = []
-            thinking_content = []
-            
-            async for chunk in service.send_message_stream(
-                conversation_id=test_conversation.id,
-                user_id=test_user.id,
-                content="Test"
-            ):
-                chunks.append(chunk)
-            
-            # Verify we got all chunks
-            full_content = "".join(chunks)
-            assert "<think>" in full_content
-            assert "I'm thinking about this" in full_content
-            assert "</think>" in full_content
-            assert "Here's my response" in full_content
-            
-            # Verify message was saved with thinking
-            assert mock_add.call_count == 2  # User and assistant messages
-            assistant_call = mock_add.call_args_list[1]
-            assert assistant_call[1]['thinking'] == "I'm thinking about this"
+        chunks = []
+        async for chunk in service.send_message_stream(
+            conversation_id=test_conversation.id,
+            user_id=test_user.id,
+            content="Test"
+        ):
+            chunks.append(chunk)
+        
+        # Verify we got all chunks
+        full_content = "".join(chunks)
+        assert "<think>" in full_content
+        assert "I'm thinking about this" in full_content
+        assert "</think>" in full_content
+        assert "Here's my response" in full_content
+        
+        # Verify messages were saved with thinking
+        messages = session.query(ChatMessage).filter(
+            ChatMessage.conversation_id == test_conversation.id
+        ).order_by(ChatMessage.message_index).all()
+        
+        # Find the last assistant message
+        assistant_msg = messages[-1]
+        assert assistant_msg.role == MessageRole.ASSISTANT
+        assert assistant_msg.content == "Here's my response"
+        assert assistant_msg.thinking == "I'm thinking about this"
     
     @pytest.mark.asyncio
     async def test_create_temporary_conversation(
@@ -346,18 +355,20 @@ class TestEnhancedChatService:
         mock_agent.get_stream_response = mock_complex_stream
         service.agent = mock_agent
         
-        with patch.object(service.conversation_service, 'add_message') as mock_add:
-            mock_add.return_value = MagicMock(id=uuid4())
-            
-            chunks = []
-            async for chunk in service.send_message_stream(
-                conversation_id=test_conversation.id,
-                user_id=test_user.id,
-                content="What's the answer?"
-            ):
-                chunks.append(chunk)
-            
-            # Check final assistant message call
-            assistant_call = mock_add.call_args_list[1]
-            assert assistant_call[1]['content'] == "Let me thinkThe answer is 42"
-            assert assistant_call[1]['thinking'] == "First thought and second thought"
+        chunks = []
+        async for chunk in service.send_message_stream(
+            conversation_id=test_conversation.id,
+            user_id=test_user.id,
+            content="What's the answer?"
+        ):
+            chunks.append(chunk)
+        
+        # Get saved messages
+        messages = session.query(ChatMessage).filter(
+            ChatMessage.conversation_id == test_conversation.id
+        ).order_by(ChatMessage.message_index).all()
+        
+        # Check final assistant message
+        assistant_msg = messages[-1]
+        assert assistant_msg.content == "Let me thinkThe answer is 42"
+        assert assistant_msg.thinking == "First thought and second thought"
