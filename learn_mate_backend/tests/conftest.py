@@ -46,6 +46,18 @@ class MockChatOllama:
     
     def invoke(self, *args, **kwargs):
         return MagicMock(content="Test response")
+    
+    async def astream(self, *args, **kwargs):
+        # Mock streaming responses
+        chunks = [
+            MagicMock(content="This "),
+            MagicMock(content="is "),
+            MagicMock(content="a "),
+            MagicMock(content="test "),
+            MagicMock(content="response")
+        ]
+        for chunk in chunks:
+            yield chunk
 
 sys.modules['langchain_ollama'].ChatOllama = MockChatOllama
 sys.modules['langchain_openai'].ChatOpenAI = MockChatOllama  # Use same mock for ChatOpenAI
