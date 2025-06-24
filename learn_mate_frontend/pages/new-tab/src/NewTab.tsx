@@ -172,12 +172,14 @@ const NewTab = () => {
   const [useStream, setUseStream] = useState(true);
   const [thinkingContent, setThinkingContent] = useState('');
   const [showThinking, setShowThinking] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
   const [isThinkingExpanded, setIsThinkingExpanded] = useState(true);
-  const [copiedMessageId, setCopiedMessageId] = useState<number | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [expandedThinkingIds, setExpandedThinkingIds] = useState<Set<number>>(new Set());
 
   // 会话管理状态
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -353,11 +355,12 @@ const NewTab = () => {
         setShowThinking(true);
         setIsThinkingExpanded(true); // 默认展开
 
-        await conversationService.sendMessageStream(
-          conversationId,
-          userMessage.content,
-          // 统一的chunk处理函数
-          (chunk: string) => {
+        try {
+          await conversationService.sendMessageStream(
+            conversationId,
+            userMessage.content,
+            // 统一的chunk处理函数
+            (chunk: string) => {
             console.log(`🔥 Received raw chunk from API:`, JSON.stringify(chunk));
             const parsed = streamParserRef.current!.processChunk(chunk);
 
@@ -428,55 +431,52 @@ const NewTab = () => {
               });
             }
           },
-          () => {
-            console.log(`✅ Stream completed successfully`);
-            const finalContent = streamParserRef.current?.getContent();
-            console.log(`📊 Final stream statistics:`, {
-              thinkingLength: finalContent?.thinking.length || 0,
-              responseLength: finalContent?.response.length || 0,
-              assistantMessageAdded,
-            });
-            setIsLoading(false);
-            setIsThinking(false);
-
-            // 刷新会话列表以更新消息计数
-            conversationListRef.current?.refresh();
-          },
-          (error: Error) => {
-            console.error('❌ Stream error:', error);
-            console.log(`📊 Error state statistics:`, {
-              assistantMessageAdded,
-              currentThinkingLength: thinkingContent.length,
-              parseState: streamParserRef.current ? 'exists' : 'null',
-            });
-            setIsLoading(false);
-            setIsThinking(false);
-
-            // 如果还没有添加助手消息，先添加一个错误消息
-            if (!assistantMessageAdded) {
-              console.log(`➕ Adding error message (no assistant message yet)`);
-              setMessages(prev => [
-                ...prev,
-                {
-                  role: 'assistant' as const,
-                  content: '抱歉，发生了错误。请稍后重试。',
-                  timestamp: new Date(),
-                },
-              ]);
-            } else {
-              console.log(`🔄 Updating existing message with error`);
-              // 更新现有消息为错误状态
-              setMessages(prev => {
-                const newMessages = [...prev];
-                const lastMessage = newMessages[newMessages.length - 1];
-                if (lastMessage.role === 'assistant' && !lastMessage.content) {
-                  lastMessage.content = '抱歉，发生了错误。请稍后重试。';
-                }
-                return newMessages;
-              });
-            }
-          },
         );
+
+        console.log(`✅ Stream completed successfully`);
+        const finalContent = streamParserRef.current?.getContent();
+        console.log(`📊 Final stream statistics:`, {
+          thinkingLength: finalContent?.thinking.length || 0,
+          responseLength: finalContent?.response.length || 0,
+        });
+        setIsLoading(false);
+        setIsThinking(false);
+
+        // 刷新会话列表以更新消息计数
+        conversationListRef.current?.refresh();
+        } catch (error) {
+          console.error('❌ Stream error:', error);
+          console.log(`📊 Error state statistics:`, {
+            currentThinkingLength: thinkingContent.length,
+            parseState: streamParserRef.current ? 'exists' : 'null',
+          });
+          setIsLoading(false);
+          setIsThinking(false);
+
+          // 如果还没有添加助手消息，先添加一个错误消息
+          if (messages[messages.length - 1]?.role !== 'assistant') {
+            console.log(`➕ Adding error message (no assistant message yet)`);
+            setMessages(prev => [
+              ...prev,
+              {
+                role: 'assistant' as const,
+                content: '抱歉，发生了错误。请稍后重试。',
+                timestamp: new Date(),
+              },
+            ]);
+          } else {
+            console.log(`🔄 Updating existing message with error`);
+            // 更新现有消息为错误状态
+            setMessages(prev => {
+              const newMessages = [...prev];
+              const lastMessage = newMessages[newMessages.length - 1];
+              if (lastMessage.role === 'assistant' && !lastMessage.content) {
+                lastMessage.content = '抱歉，发生了错误。请稍后重试。';
+              }
+              return newMessages;
+            });
+          }
+        }
       } else {
         // 使用普通响应
         const response = await conversationService.sendMessage(conversationId, userMessage.content);
@@ -679,7 +679,7 @@ const NewTab = () => {
         {/* 会话列表 */}
         <ConversationList
           ref={conversationListRef}
-          currentConversationId={currentConversationId}
+          currentConversationId={currentConversationId || undefined}
           onSelectConversation={loadConversation}
           onCreateConversation={createNewConversation}
           isLight={isLight}
@@ -1061,7 +1061,7 @@ const NewTab = () => {
                                 <button
                                   onClick={() => {
                                     navigator.clipboard.writeText(message.content);
-                                    setCopiedMessageId(index);
+                                    setCopiedMessageId(String(index));
                                     setTimeout(() => setCopiedMessageId(null), 2000);
                                   }}
                                   className={cn(
