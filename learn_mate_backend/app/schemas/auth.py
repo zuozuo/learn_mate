@@ -2,6 +2,7 @@
 
 import re
 from datetime import datetime
+from typing import Optional
 
 from pydantic import (
     BaseModel,
@@ -38,6 +39,42 @@ class TokenResponse(BaseModel):
     access_token: str = Field(..., description="The JWT access token")
     token_type: str = Field(default="bearer", description="The type of token")
     expires_at: datetime = Field(..., description="When the token expires")
+
+
+class UserRegister(BaseModel):
+    """Request model for user registration.
+
+    Attributes:
+        email: User's email address
+        username: User's username
+        password: User's password
+    """
+
+    email: EmailStr = Field(..., description="User's email address")
+    username: str = Field(..., description="User's username", min_length=3, max_length=50)
+    password: SecretStr = Field(..., description="User's password", min_length=8, max_length=64)
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        """Validate username format."""
+        if not re.match(r"^[a-zA-Z0-9_-]+$", v):
+            raise ValueError("Username can only contain letters, numbers, hyphens and underscores")
+        return v
+
+
+class UserLogin(BaseModel):
+    """Request model for user login.
+
+    Attributes:
+        email: User's email address
+        password: User's password
+        remember_me: Whether to create a long-lived token
+    """
+
+    email: EmailStr = Field(..., description="User's email address")
+    password: SecretStr = Field(..., description="User's password")
+    remember_me: bool = Field(default=False, description="Whether to create a long-lived token")
 
 
 class UserCreate(BaseModel):
@@ -127,3 +164,47 @@ class SessionResponse(BaseModel):
         # Remove any potentially harmful characters
         sanitized = re.sub(r'[<>{}[\]()\'"`]', "", v)
         return sanitized
+
+
+class LoginResponse(BaseModel):
+    """Response model for login endpoint.
+
+    Attributes:
+        access_token: JWT access token
+        refresh_token: JWT refresh token (optional)
+        token_type: Token type (bearer)
+        expires_in: Access token expiration time in seconds
+        user: User information
+    """
+
+    access_token: str = Field(..., description="JWT access token")
+    refresh_token: Optional[str] = Field(None, description="JWT refresh token")
+    token_type: str = Field(default="bearer", description="Token type")
+    expires_in: int = Field(..., description="Access token expiration time in seconds")
+    user: "UserInfo" = Field(..., description="User information")
+
+
+class UserInfo(BaseModel):
+    """User information model.
+
+    Attributes:
+        id: User ID
+        email: User email
+        username: Username
+        created_at: Account creation timestamp
+    """
+
+    id: int = Field(..., description="User ID")
+    email: str = Field(..., description="User email")
+    username: str = Field(..., description="Username")
+    created_at: datetime = Field(..., description="Account creation timestamp")
+
+
+class TokenRefreshRequest(BaseModel):
+    """Request model for token refresh.
+
+    Attributes:
+        refresh_token: The refresh token
+    """
+
+    refresh_token: str = Field(..., description="The refresh token")
