@@ -123,6 +123,7 @@ from app.services.database import database_service  # noqa: E402
 from app.models.user import User  # noqa: E402
 from app.models.conversation import Conversation  # noqa: E402
 from app.models.chat_message import ChatMessage, MessageRole  # noqa: E402
+from app.models.login_history import LoginHistory  # noqa: E402
 from app.utils.auth import create_access_token  # noqa: E402
 
 
