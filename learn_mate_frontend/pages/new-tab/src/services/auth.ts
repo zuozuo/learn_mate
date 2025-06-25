@@ -37,18 +37,32 @@ class AuthService {
   }
 
   // 登录
-  async login(username: string, password: string): Promise<User> {
-    const response = await apiService.login(username, password);
-    const user: User = { username };
+  async login(email: string, password: string, rememberMe: boolean = false): Promise<User> {
+    const response = await apiService.accountLogin(email, password, rememberMe);
+    const user: User = {
+      id: response.user.id,
+      username: response.user.username,
+      email: response.user.email,
+    };
     this.setAuth(response.access_token, user);
+
+    // 如果有 refresh token，保存它
+    if (response.refresh_token) {
+      localStorage.setItem('learn_mate_refresh_token', response.refresh_token);
+    }
+
     return user;
   }
 
   // 注册
-  async register(username: string, email: string, password: string): Promise<User> {
-    const response = await apiService.register(username, email, password);
-    const user: User = { username, email };
-    this.setAuth(response.access_token, user);
+  async register(email: string, username: string, password: string): Promise<User> {
+    const response = await apiService.accountRegister(email, username, password);
+    const user: User = {
+      id: response.id,
+      username: response.username,
+      email: response.email,
+    };
+    // 注册成功后不自动登录，返回用户信息
     return user;
   }
 
@@ -130,6 +144,7 @@ class AuthService {
 }
 
 export interface User {
+  id?: string | number;
   username: string;
   email?: string;
 }

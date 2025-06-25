@@ -87,7 +87,7 @@ class ApiService {
     return { access_token: data.token.access_token };
   }
 
-  // 用户登录
+  // 用户登录（旧版本，用于临时用户）
   async login(username: string, password: string): Promise<{ access_token: string }> {
     const formData = new FormData();
     formData.append('username', username);
@@ -105,6 +105,103 @@ class ApiService {
     }
 
     return response.json();
+  }
+
+  // 账号登录（新版本）
+  async accountLogin(
+    email: string,
+    password: string,
+    rememberMe: boolean = false,
+  ): Promise<{
+    access_token: string;
+    refresh_token?: string;
+    token_type: string;
+    expires_in: number;
+    user: {
+      id: number;
+      email: string;
+      username: string;
+      created_at: string;
+    };
+  }> {
+    const response = await fetch(`${this.baseUrl}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        email,
+        password,
+        remember_me: rememberMe,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || '登录失败');
+    }
+
+    return response.json();
+  }
+
+  // 账号注册（新版本）
+  async accountRegister(
+    email: string,
+    username: string,
+    password: string,
+  ): Promise<{
+    id: number;
+    email: string;
+    username: string;
+    created_at: string;
+  }> {
+    const response = await fetch(`${this.baseUrl}/api/v1/auth/register`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        email,
+        username,
+        password,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || '注册失败');
+    }
+
+    return response.json();
+  }
+
+  // 获取当前用户信息
+  async getCurrentUser(): Promise<{
+    id: number;
+    email: string;
+    username: string;
+    created_at: string;
+  }> {
+    const response = await fetch(`${this.baseUrl}/api/v1/auth/me`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || '获取用户信息失败');
+    }
+
+    return response.json();
+  }
+
+  // 登出
+  async logout(): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/api/v1/auth/logout`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || '登出失败');
+    }
   }
 
   // 发送聊天消息

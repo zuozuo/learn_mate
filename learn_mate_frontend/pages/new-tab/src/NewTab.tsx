@@ -1,8 +1,10 @@
 import '@src/NewTab.css';
 import '@src/NewTab.scss';
 import { ConversationList } from './components/ConversationList';
+import { Login } from './components/Login';
 import { MessageEditor } from './components/MessageEditor';
 import { VersionSelector } from './components/VersionSelector';
+import { useAuth } from './contexts/AuthContext';
 import { apiService } from './services/api';
 import { authService } from './services/auth';
 import { conversationService } from './services/conversation';
@@ -13,7 +15,6 @@ import { cn, ErrorDisplay, LoadingSpinner, ToggleButton } from '@extension/ui';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { ConversationListRef } from './components/ConversationList';
 import type { Message as ApiMessage } from './services/api';
-import type { User } from './services/auth';
 
 // 扩展Message类型以包含thinking内容和版本信息
 interface Message extends ApiMessage {
@@ -177,11 +178,11 @@ class StreamParser {
 
 const NewTab = () => {
   const { isLight } = useStorage(exampleThemeStorage);
+  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [useStream] = useState(true);
@@ -288,25 +289,8 @@ const NewTab = () => {
           return;
         }
 
-        // 2. 初始化认证
-        authService.init();
-
-        // 3. 检查是否已有认证用户
-        let currentUser = authService.getUser();
-
-        if (!currentUser && connected) {
-          // 4. 创建临时会话
-          try {
-            currentUser = await authService.createTemporarySession();
-          } catch (error) {
-            console.error('Failed to create temporary session:', error);
-          }
-        }
-
-        setUser(currentUser);
-
-        // 5. 检查 URL 中是否有对话 ID，如果有则加载对应对话
-        if (currentUser && connected) {
+        // 2. 检查 URL 中是否有对话 ID，如果有则加载对应对话
+        if (isAuthenticated && connected) {
           const urlConversationId = getConversationIdFromUrl();
           if (urlConversationId) {
             try {
@@ -325,8 +309,10 @@ const NewTab = () => {
       }
     };
 
-    initApp();
-  }, [loadConversation]);
+    if (!isAuthLoading) {
+      initApp();
+    }
+  }, [loadConversation, isAuthenticated, isAuthLoading]);
 
   // 定期检查后端连接状态
   useEffect(() => {
@@ -833,6 +819,20 @@ const NewTab = () => {
     );
   }
 
+  // 如果正在加载认证状态，显示加载界面
+  if (isAuthLoading || isInitializing) {
+    return (
+      <div className={cn('flex min-h-screen items-center justify-center', isLight ? 'bg-white' : 'bg-gray-950')}>
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  // 如果未登录，显示登录界面
+  if (!isAuthenticated) {
+    return <Login onLoginSuccess={() => {}} />;
+  }
+
   return (
     <div className={cn('min-h-screen', isLight ? 'bg-white' : 'bg-gray-950')}>
       {/* 左侧边栏 */}
@@ -882,19 +882,43 @@ const NewTab = () => {
 
           {/* 用户信息 */}
           {user && (
-            <div className="flex items-center justify-between">
-              <span className={cn('text-sm', isLight ? 'text-gray-600' : 'text-gray-300')}>用户</span>
-              <span className={cn('text-xs', isLight ? 'text-gray-500' : 'text-gray-400')}>
-                {user.username.startsWith('temp_') ? '游客模式' : user.username}
-              </span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className={cn('text-sm', isLight ? 'text-gray-600' : 'text-gray-300')}>用户</span>
+                <span className={cn('text-xs', isLight ? 'text-gray-500' : 'text-gray-400')}>
+                  {user.username.startsWith('temp_') ? '游客模式' : user.username}
+                </span>
+              </div>
+              {user.email && (
+                <div className="flex items-center justify-between">
+                  <span className={cn('text-sm', isLight ? 'text-gray-600' : 'text-gray-300')}>邮箱</span>
+                  <span className={cn('max-w-[150px] truncate text-xs', isLight ? 'text-gray-500' : 'text-gray-400')}>
+                    {user.email}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
-          {/* 主题切换按钮 */}
-          <div className="flex justify-center">
-            <ToggleButton onClick={exampleThemeStorage.toggle} className="p-1">
+          {/* 操作按钮 */}
+          <div className="flex items-center justify-between space-x-2">
+            {/* 主题切换按钮 */}
+            <ToggleButton onClick={exampleThemeStorage.toggle} className="flex-1 p-1">
               <span className="text-lg">{isLight ? '🌙' : '☀️'}</span>
             </ToggleButton>
+
+            {/* 登出按钮 */}
+            <button
+              onClick={() => {
+                authService.logout();
+                window.location.reload();
+              }}
+              className={cn(
+                'flex-1 rounded-md px-3 py-1 text-sm transition-colors',
+                isLight ? 'text-gray-600 hover:bg-gray-100' : 'text-gray-400 hover:bg-gray-800',
+              )}>
+              登出
+            </button>
           </div>
         </div>
       </div>
