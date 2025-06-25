@@ -28,9 +28,9 @@ def upgrade() -> None:
     op.add_column("user", sa.Column("last_login_at", sa.DateTime(), nullable=True))
 
     # Update existing rows with default values
-    op.execute("UPDATE user SET username = email WHERE username IS NULL")
-    op.execute("UPDATE user SET is_active = true WHERE is_active IS NULL")
-    op.execute("UPDATE user SET is_verified = false WHERE is_verified IS NULL")
+    op.execute('UPDATE "user" SET username = email WHERE username IS NULL')
+    op.execute('UPDATE "user" SET is_active = true WHERE is_active IS NULL')
+    op.execute('UPDATE "user" SET is_verified = false WHERE is_verified IS NULL')
 
     # Make username and new columns not nullable
     op.alter_column("user", "username", nullable=False)

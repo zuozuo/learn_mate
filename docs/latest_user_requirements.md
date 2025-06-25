@@ -1,48 +1,76 @@
 # Latest User Requirements
 
-## 当前任务：账号登录功能实现
+## 当前任务：账号登录功能实现 - 第二阶段
 
-### 需求描述
-添加账号登录功能，支持用户注册、登录、认证和会话管理。
+### 任务描述
+完成账号登录功能的实现，包括前后端集成和测试。
 
-### 设计方案
-1. **功能需求**：
-   - 用户注册（邮箱+密码）
-   - 用户登录
-   - 密码重置
-   - 会话管理（JWT Token）
-   - 自动登录（Remember Me）
-   - 登出功能
+### 已完成工作
 
-2. **技术架构**：
-   - 后端：FastAPI + SQLAlchemy + PostgreSQL + JWT + bcrypt
-   - 前端：React + TypeScript + Axios + React Context
+1. **设计文档**
+   - ✅ 创建了详细的设计文档 `docs/design/account-login-design.md`
 
-3. **安全措施**：
-   - 密码使用 bcrypt 加密（cost factor: 12）
-   - JWT Token 认证（Access Token: 1小时，Refresh Token: 7天）
-   - 登录保护（连续失败5次锁定15分钟）
+2. **后端实现**
+   - ✅ 扩展 User 模型添加认证字段（username, is_active, is_verified, last_login_at）
+   - ✅ 创建 LoginHistory 模型记录登录历史
+   - ✅ 实现 JWT 认证工具（JWTManager）
+   - ✅ 创建认证 API 端点（/auth/register, /auth/login, /auth/refresh, /auth/logout, /auth/me）
+   - ✅ 实现 AuthServiceSync 处理认证业务逻辑
+   - ✅ 修复同步/异步数据库不一致问题
 
-### 进度跟踪
-- [x] 创建设计文档 docs/design/account-login-design.md
-- [ ] 实现后端用户认证系统
-  - [ ] 创建用户数据模型
-  - [ ] 实现密码加密工具
-  - [ ] 实现 JWT 工具类
-  - [ ] 创建认证路由和控制器
-  - [ ] 添加认证中间件
-  - [ ] 更新现有 API 添加认证保护
-- [ ] 实现前端登录界面和逻辑
-  - [ ] 创建登录/注册页面组件
-  - [ ] 实现 AuthContext 和 useAuth Hook
-  - [ ] 创建 API 认证拦截器
-  - [ ] 实现路由保护
-  - [ ] 添加自动登录功能
-- [ ] 集成前后端登录功能
-- [ ] 测试登录功能
+3. **前端实现**
+   - ✅ 创建 Login 组件（登录/注册界面）
+   - ✅ 实现 AuthContext 和 useAuth Hook
+   - ✅ 更新 authService 支持账号登录
+   - ✅ 集成登录界面到 NewTab 组件
+   - ✅ 添加登出功能
 
-### 注意事项
-1. 需要考虑与现有临时用户系统的兼容性
-2. 数据迁移方案：为现有对话记录添加 user_id 字段
-3. 确保所有敏感操作都需要认证
-4. 实现合理的会话超时机制
+4. **数据库迁移**
+   - ✅ 创建 Alembic 迁移添加认证字段
+   - ✅ 创建 login_history 表
+
+### 当前问题
+
+1. **测试失败**
+   - 部分测试因为缺少 username 字段而失败
+   - 需要运行数据库迁移更新表结构
+
+2. **待完成工作**
+   - 修复所有测试，确保 before_commit.sh 通过
+   - 手动测试前后端集成的登录功能
+   - 添加密码重置功能（可选）
+   - 完善错误处理和用户提示
+
+### 技术要点
+
+1. **认证流程**
+   - 使用 JWT 双令牌机制（access token + refresh token）
+   - 支持"记住我"功能（返回 refresh token）
+   - 登录历史记录追踪
+
+2. **安全措施**
+   - bcrypt 密码加密（cost factor 12）
+   - JWT 有效期：access token 1小时，refresh token 7天
+   - 登录失败记录
+
+3. **兼容性**
+   - 保留临时用户（访客模式）功能
+   - 支持从访客升级为注册用户
+
+### 下一步行动
+
+1. 运行数据库迁移：`alembic upgrade head`
+2. 修复测试中的 username 字段问题
+3. 手动测试登录功能：
+   - 注册新用户
+   - 登录/登出
+   - 访客模式
+   - Token 刷新
+
+### 相关文件
+
+- 设计文档：`/docs/design/account-login-design.md`
+- 后端认证：`/app/api/v1/account.py`, `/app/services/auth_service_sync.py`
+- 前端组件：`/pages/new-tab/src/components/Login.tsx`
+- 认证上下文：`/pages/new-tab/src/contexts/AuthContext.tsx`
+- 数据库迁移：`/alembic/versions/e0c85538e3c1_add_user_authentication_tables.py`
