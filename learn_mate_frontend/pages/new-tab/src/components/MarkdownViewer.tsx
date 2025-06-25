@@ -1,12 +1,15 @@
+import { cn } from '@extension/ui';
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import Link from '@tiptap/extension-link';
+import Typography from '@tiptap/extension-typography';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Typography from '@tiptap/extension-typography';
-import Link from '@tiptap/extension-link';
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import { lowlight } from 'lowlight';
-import { cn } from '@extension/ui';
+import { createLowlight } from 'lowlight';
 import { useEffect } from 'react';
 import './MarkdownViewer.scss';
+
+// 创建 lowlight 实例
+const lowlight = createLowlight();
 
 interface MarkdownViewerProps {
   content: string;
@@ -14,7 +17,7 @@ interface MarkdownViewerProps {
   className?: string;
 }
 
-export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, isLight = true, className }) => {
+const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, isLight = true, className }) => {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -46,11 +49,7 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, isLight
     editable: false,
     editorProps: {
       attributes: {
-        class: cn(
-          'prose prose-sm max-w-none focus:outline-none',
-          isLight ? 'prose-gray' : 'prose-invert',
-          className,
-        ),
+        class: cn('prose prose-sm max-w-none focus:outline-none', isLight ? 'prose-gray' : 'prose-invert', className),
       },
     },
   });
@@ -67,13 +66,14 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ content, isLight
 };
 
 // 简单的 Markdown 到 HTML 转换函数
-function parseMarkdownToHTML(markdown: string): string {
+const parseMarkdownToHTML = (markdown: string): string => {
   let html = markdown;
 
   // 代码块
-  html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
-    return `<pre><code class="language-${lang || 'plaintext'}">${escapeHtml(code.trim())}</code></pre>`;
-  });
+  html = html.replace(
+    /```(\w+)?\n([\s\S]*?)```/g,
+    (match, lang, code) => `<pre><code class="language-${lang || 'plaintext'}">${escapeHtml(code.trim())}</code></pre>`,
+  );
 
   // 行内代码
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -111,9 +111,9 @@ function parseMarkdownToHTML(markdown: string): string {
     .join('\n');
 
   return html;
-}
+};
 
-function escapeHtml(text: string): string {
+const escapeHtml = (text: string): string => {
   const map: { [key: string]: string } = {
     '&': '&amp;',
     '<': '&lt;',
@@ -122,4 +122,6 @@ function escapeHtml(text: string): string {
     "'": '&#039;',
   };
   return text.replace(/[&<>"']/g, m => map[m]);
-}
+};
+
+export { MarkdownViewer };

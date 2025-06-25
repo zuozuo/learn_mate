@@ -4,19 +4,19 @@
   }
 
   h1 {
-    @apply text-2xl font-bold mb-4 mt-6;
+    @apply mb-4 mt-6 text-2xl font-bold;
   }
 
   h2 {
-    @apply text-xl font-semibold mb-3 mt-5;
+    @apply mb-3 mt-5 text-xl font-semibold;
   }
 
   h3 {
-    @apply text-lg font-semibold mb-2 mt-4;
+    @apply mb-2 mt-4 text-lg font-semibold;
   }
 
   h4 {
-    @apply text-base font-semibold mb-2 mt-3;
+    @apply mb-2 mt-3 text-base font-semibold;
   }
 
   p {
@@ -41,18 +41,18 @@
   }
 
   blockquote {
-    @apply border-l-4 border-gray-300 pl-4 italic my-4;
+    @apply my-4 border-l-4 border-gray-300 pl-4 italic;
   }
 
   code {
-    @apply px-1.5 py-0.5 rounded text-sm;
+    @apply rounded px-1.5 py-0.5 text-sm;
   }
 
   pre {
     @apply mb-4;
 
     code {
-      @apply block p-4 rounded-lg text-sm leading-relaxed overflow-x-auto;
+      @apply block overflow-x-auto rounded-lg p-4 text-sm leading-relaxed;
     }
   }
 
@@ -73,7 +73,7 @@
   }
 
   table {
-    @apply w-full mb-4 border-collapse;
+    @apply mb-4 w-full border-collapse;
 
     th,
     td {

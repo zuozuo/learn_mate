@@ -24,6 +24,13 @@
     "@extension/shared": "workspace:*",
     "@extension/storage": "workspace:*",
     "@extension/ui": "workspace:*",
+    "@tiptap/extension-code-block-lowlight": "^2.22.3",
+    "@tiptap/extension-link": "^2.22.3",
+    "@tiptap/extension-typography": "^2.22.3",
+    "@tiptap/pm": "^2.22.3",
+    "@tiptap/react": "^2.22.3",
+    "@tiptap/starter-kit": "^2.22.3",
+    "lowlight": "^3.3.0",
     "lucide-react": "^0.395.0"
   },
   "devDependencies": {

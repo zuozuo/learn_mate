@@ -1,9 +1,9 @@
 import '@src/NewTab.css';
 import '@src/NewTab.scss';
 import { ConversationList } from './components/ConversationList';
+import { MarkdownViewer } from './components/MarkdownViewer';
 import { MessageEditor } from './components/MessageEditor';
 import { VersionSelector } from './components/VersionSelector';
-import { MarkdownViewer } from './components/MarkdownViewer';
 import { apiService } from './services/api';
 import { authService } from './services/auth';
 import { conversationService } from './services/conversation';
@@ -1266,10 +1266,12 @@ const NewTab = () => {
                                 'response-content text-base leading-relaxed',
                                 isLight ? 'text-gray-900' : 'dark text-gray-100',
                               )}>
-                              {message.content
-                                ? <MarkdownViewer content={message.content} isLight={isLight} />
-                                : isLoading &&
-                                  isLastMessage && <span className="inline-block h-4 w-2 animate-pulse bg-current" />}
+                              {message.content ? (
+                                <MarkdownViewer content={message.content} isLight={isLight} />
+                              ) : (
+                                isLoading &&
+                                isLastMessage && <span className="inline-block h-4 w-2 animate-pulse bg-current" />
+                              )}
                             </div>
 
                             {/* 底部操作栏 */}
