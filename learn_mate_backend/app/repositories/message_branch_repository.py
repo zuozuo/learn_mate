@@ -81,7 +81,7 @@ class MessageBranchRepository:
 
     def update_branch_name(self, branch_id: UUID, name: str) -> Optional[MessageBranch]:
         """Update branch name."""
-        branch = await self.get_branch(branch_id)
+        branch = self.get_branch(branch_id)
         if branch:
             branch.branch_name = name
             self.session.commit()
@@ -103,9 +103,7 @@ class MessageBranchRepository:
             # Traverse up to find the root
             current = original
             while current.parent_version_id:
-                result = self.session.execute(
-                    select(ChatMessage).where(ChatMessage.id == current.parent_version_id)
-                )
+                result = self.session.execute(select(ChatMessage).where(ChatMessage.id == current.parent_version_id))
                 parent = result.scalar_one_or_none()
                 if not parent:
                     break

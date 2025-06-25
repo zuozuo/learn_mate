@@ -74,10 +74,7 @@ def get_message_versions(
 
 
 @router.get("/{conversation_id}/branches", response_model=List[MessageBranchSchema])
-def get_conversation_branches(
-    conversation_id: UUID, 
-    current_user: User = Depends(get_current_user)
-):
+def get_conversation_branches(conversation_id: UUID, current_user: User = Depends(get_current_user)):
     """Get all branches for a conversation."""
     with Session(database_service.engine) as session:
         # Verify user owns the conversation
@@ -118,10 +115,7 @@ def switch_branch(
 
 
 @router.get("/{conversation_id}/branch-tree", response_model=List[BranchTreeNode])
-def get_branch_tree(
-    conversation_id: UUID, 
-    current_user: User = Depends(get_current_user)
-):
+def get_branch_tree(conversation_id: UUID, current_user: User = Depends(get_current_user)):
     """Get the branch tree structure for visualization."""
     with Session(database_service.engine) as session:
         # Verify user owns the conversation

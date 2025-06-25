@@ -48,9 +48,7 @@ class MessageBranchService:
         # Create new branch if requested
         new_branch = None
         if create_branch:
-            new_branch = self.branch_repo.create_branch(
-                conversation_id=conversation_id, parent_message_id=message_id
-            )
+            new_branch = self.branch_repo.create_branch(conversation_id=conversation_id, parent_message_id=message_id)
 
         # Create new version of the message
         new_version = ChatMessage(

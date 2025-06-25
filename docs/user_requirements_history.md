@@ -1,5 +1,56 @@
 # User Requirements History
 
+## 2025-06-25 - 消息修改和分支功能实现
+
+### 需求描述
+用户希望实现类似 ChatGPT 的消息编辑功能：
+1. 用户可以修改某个对话中的某一条历史消息
+2. 修改后重新发送，会在该节点形成一个新的消息历史分支
+3. 用户可以在修改的消息上切换不同版本对应的消息历史
+4. 类似树状结构的对话历史管理
+
+### 设计方案
+1. 创建了详细的设计文档 docs/design/message-branching-system.md
+2. 设计了数据库结构：新增 message_branches 表，扩展 chat_messages 表
+3. 规划了 RESTful API 接口
+4. 设计了前端 UI 交互
+
+### 实施情况
+✅ 已完成工作：
+1. **数据库设计与迁移**
+   - 创建了 message_branches 表
+   - 扩展了 chat_messages 表添加分支相关字段
+   - 编写了 SQL 迁移脚本
+
+2. **后端实现**
+   - 创建了 MessageBranch 模型
+   - 实现了 MessageBranchRepository
+   - 实现了 MessageBranchService 业务逻辑
+   - 添加了 5 个 API 端点
+
+3. **前端实现**
+   - 创建了 MessageEditor 组件
+   - 创建了 VersionSelector 组件
+   - 实现了 messageBranchService
+   - 集成到现有聊天界面
+
+4. **问题修复**
+   - 修复了 lucide-react 图标导入问题（使用内联 SVG）
+   - 修复了 apiService 私有属性访问问题
+   - 修复了 repository 中的语法错误（await 在非异步函数中）
+   - 修复了单元测试中的 fixture 命名问题
+
+### 技术要点
+- 使用树状结构管理消息分支
+- 支持消息版本控制
+- 实现了分支切换和版本导航
+- 保持了与现有系统的兼容性
+
+### 待完成工作
+- 完善单元测试覆盖
+- 性能优化（大量分支时的查询优化）
+- UI/UX 细节优化
+
 ## 2025-06-24 - 消息修改和分支功能需求
 
 ### 需求描述

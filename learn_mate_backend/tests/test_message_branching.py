@@ -10,14 +10,13 @@ from app.repositories.message_branch_repository import MessageBranchRepository
 from app.services.message_branch_service import MessageBranchService
 
 
-@pytest.mark.asyncio
-async def test_create_branch(db_session):
+def test_create_branch(mock_db_session):
     """Test creating a new message branch."""
-    repo = MessageBranchRepository(db_session)
+    repo = MessageBranchRepository(mock_db_session)
     conversation_id = uuid4()
 
     # Create main branch
-    main_branch = await repo.create_branch(conversation_id=conversation_id, parent_message_id=None, branch_name="Main")
+    main_branch = repo.create_branch(conversation_id=conversation_id, parent_message_id=None, branch_name="Main")
 
     assert main_branch.conversation_id == conversation_id
     assert main_branch.parent_message_id is None
@@ -26,7 +25,7 @@ async def test_create_branch(db_session):
 
     # Create alternative branch
     parent_message_id = uuid4()
-    alt_branch = await repo.create_branch(conversation_id=conversation_id, parent_message_id=parent_message_id)
+    alt_branch = repo.create_branch(conversation_id=conversation_id, parent_message_id=parent_message_id)
 
     assert alt_branch.conversation_id == conversation_id
     assert alt_branch.parent_message_id == parent_message_id
@@ -34,14 +33,13 @@ async def test_create_branch(db_session):
     assert alt_branch.sequence_number == 1
 
 
-@pytest.mark.asyncio
-async def test_get_message_versions(db_session):
+def test_get_message_versions(mock_db_session):
     """Test getting all versions of a message."""
-    repo = MessageBranchRepository(db_session)
+    repo = MessageBranchRepository(mock_db_session)
     conversation_id = uuid4()
 
     # Create a branch
-    branch = await repo.create_branch(conversation_id)
+    branch = repo.create_branch(conversation_id)
 
     # Create original message
     original = ChatMessage(
@@ -52,8 +50,8 @@ async def test_get_message_versions(db_session):
         branch_id=branch.id,
         version_number=1,
     )
-    db_session.add(original)
-    await db_session.commit()
+    mock_db_session.add(original)
+    mock_db_session.commit()
 
     # Create edited version
     edited = ChatMessage(
@@ -65,26 +63,25 @@ async def test_get_message_versions(db_session):
         version_number=2,
         parent_version_id=original.id,
     )
-    db_session.add(edited)
-    await db_session.commit()
+    mock_db_session.add(edited)
+    mock_db_session.commit()
 
     # Get versions
-    versions = await repo.get_message_versions(original.id)
+    versions = repo.get_message_versions(original.id)
 
     assert len(versions) == 2
     assert versions[0].content == "Original content"
     assert versions[1].content == "Edited content"
 
 
-@pytest.mark.asyncio
-async def test_edit_message_service(db_session, mock_user):
+def test_edit_message_service(mock_db_session, test_user):
     """Test editing a message through the service layer."""
-    service = MessageBranchService(db_session)
+    service = MessageBranchService(mock_db_session)
     conversation_id = uuid4()
 
     # Create initial branch and message
-    branch_repo = MessageBranchRepository(db_session)
-    main_branch = await branch_repo.create_branch(conversation_id)
+    branch_repo = MessageBranchRepository(mock_db_session)
+    main_branch = branch_repo.create_branch(conversation_id)
 
     # Create user message
     user_message = ChatMessage(
@@ -94,11 +91,11 @@ async def test_edit_message_service(db_session, mock_user):
         message_index=1,
         branch_id=main_branch.id,
     )
-    db_session.add(user_message)
-    await db_session.commit()
+    mock_db_session.add(user_message)
+    mock_db_session.commit()
 
     # Edit the message
-    result = await service.edit_message(
+    result = service.edit_message(
         conversation_id=conversation_id,
         message_id=user_message.id,
         new_content="Tell me about JavaScript",
@@ -112,15 +109,14 @@ async def test_edit_message_service(db_session, mock_user):
     assert result.branch.parent_message_id == user_message.id
 
 
-@pytest.mark.asyncio
-async def test_branch_tree_structure(db_session):
+def test_branch_tree_structure(mock_db_session):
     """Test building branch tree structure."""
-    service = MessageBranchService(db_session)
+    service = MessageBranchService(mock_db_session)
     conversation_id = uuid4()
 
     # Create main branch
-    branch_repo = MessageBranchRepository(db_session)
-    main_branch = await branch_repo.create_branch(conversation_id=conversation_id, branch_name="Main")
+    branch_repo = MessageBranchRepository(mock_db_session)
+    main_branch = branch_repo.create_branch(conversation_id=conversation_id, branch_name="Main")
 
     # Create some messages
     for i in range(3):
@@ -131,12 +127,12 @@ async def test_branch_tree_structure(db_session):
             message_index=i,
             branch_id=main_branch.id,
         )
-        db_session.add(msg)
-    await db_session.commit()
+        mock_db_session.add(msg)
+    mock_db_session.commit()
 
     # Create alternative branch
     parent_msg_id = uuid4()
-    alt_branch = await branch_repo.create_branch(
+    alt_branch = branch_repo.create_branch(
         conversation_id=conversation_id, parent_message_id=parent_msg_id, branch_name="Alternative"
     )
 
@@ -149,11 +145,11 @@ async def test_branch_tree_structure(db_session):
             message_index=i + 3,
             branch_id=alt_branch.id,
         )
-        db_session.add(msg)
-    await db_session.commit()
+        mock_db_session.add(msg)
+    mock_db_session.commit()
 
     # Get branch tree
-    tree = await service.get_branch_tree(conversation_id)
+    tree = service.get_branch_tree(conversation_id)
 
     assert len(tree) == 1  # One root branch
     assert tree[0].name == "Main"
