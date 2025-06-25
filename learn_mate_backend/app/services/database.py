@@ -69,35 +69,14 @@ class DatabaseService:
                 raise
 
     def _create_triggers(self):
-        """Create database triggers for maintaining data integrity."""
-        try:
-            with Session(self.engine) as session:
-                # Read and execute trigger SQL
-                trigger_sql = """
-                -- Trigger to automatically update conversations.updated_at when a new message is added
-                CREATE OR REPLACE FUNCTION update_conversation_timestamp()
-                RETURNS TRIGGER AS $$
-                BEGIN
-                    UPDATE conversations 
-                    SET updated_at = CURRENT_TIMESTAMP 
-                    WHERE id = NEW.conversation_id;
-                    RETURN NEW;
-                END;
-                $$ LANGUAGE plpgsql;
+        """Create database triggers for maintaining data integrity.
 
-                -- Create the trigger
-                DROP TRIGGER IF EXISTS update_conversation_on_new_message ON chat_messages;
-                CREATE TRIGGER update_conversation_on_new_message
-                AFTER INSERT ON chat_messages
-                FOR EACH ROW
-                EXECUTE FUNCTION update_conversation_timestamp();
-                """
-                session.exec(text(trigger_sql))
-                session.commit()
-                logger.info("database_triggers_created")
-        except SQLAlchemyError as e:
-            # Triggers might already exist or table might not exist yet
-            logger.warning("database_triggers_creation_warning", error=str(e))
+        Note: Triggers are now managed by Alembic migrations.
+        This method is kept for backward compatibility but does nothing.
+        """
+        # Triggers are now created and managed through Alembic migrations
+        # See alembic/versions/84afc5dc20e9_add_conversation_update_trigger.py
+        logger.info("database_triggers_managed_by_alembic")
 
     async def create_user(self, email: str, password: str) -> User:
         """Create a new user.

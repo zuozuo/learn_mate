@@ -1,27 +1,37 @@
 # Latest User Requirements
 
-## 当前任务：使用 Alembic 管理数据库迁移
+## 当前任务：将旧的 SQL 迁移转换为 Alembic 迁移
 
 ### 任务描述
-- 使用 Alembic 管理项目的数据库 schema migrations
-- 清空现有数据库，用 Alembic 重建
+- 将旧的 SQL 迁移文件转换为 Alembic 迁移
+- 确保所有数据库功能都由 Alembic 管理
 
 ### 已完成
-1. ✅ 安装 Alembic 依赖
-2. ✅ 初始化 Alembic 配置
-3. ✅ 配置 Alembic 连接数据库（从环境变量读取 POSTGRES_URL）
-4. ✅ 创建初始迁移文件，解决循环依赖问题
-5. ✅ 清空现有数据库并执行迁移
-6. ✅ 整理旧的迁移文件到 old_migrations 目录
-7. ✅ 创建 Alembic 使用文档
+1. ✅ 分析旧的 SQL 迁移文件内容
+2. ✅ 创建了两个新的 Alembic 迁移文件：
+   - `ae197ea51943_add_triggers_and_constraints.py` - 添加触发器和约束
+   - `84afc5dc20e9_add_conversation_update_trigger.py` - 添加对话更新触发器
+3. ✅ 移除了 `database.py` 中的触发器创建代码
+4. ✅ 删除了旧的迁移文件和 schema.sql
+5. ✅ 创建了触发器检查脚本 `scripts/check_triggers.py`
 
 ### 关键变更
-1. 修改了 `alembic/env.py` 以支持 SQLModel 和从环境变量读取数据库配置
-2. 创建了初始迁移文件 `4a6711c4a20d_create_initial_tables.py`
-3. 创建了数据库清理脚本 `scripts/drop_all_tables.py`
-4. 创建了表列表脚本 `scripts/list_tables.py`
+1. **迁移文件结构**：
+   - 初始迁移：创建所有表结构
+   - 第二个迁移：添加触发器、函数和约束
+   - 第三个迁移：添加消息插入时更新对话的触发器
+
+2. **触发器管理**：
+   - `update_message_branches_updated_at` - 自动更新分支的 updated_at
+   - `update_conversations_updated_at` - 自动更新对话的 updated_at
+   - `update_conversation_on_new_message` - 新消息时更新对话时间戳
+
+3. **代码清理**：
+   - 移除了 `database.py` 中的触发器创建逻辑
+   - 删除了 `old_migrations/` 目录
+   - 删除了 `schema.sql` 文件
 
 ### 后续建议
-1. 将旧的 SQL 迁移文件转换为 Alembic 迁移
-2. 在 CI/CD 流程中集成数据库迁移
-3. 为开发环境创建种子数据脚本
+1. 在 CI/CD 流程中集成数据库迁移
+2. 为开发环境创建种子数据脚本
+3. 添加迁移测试以确保迁移的可逆性
