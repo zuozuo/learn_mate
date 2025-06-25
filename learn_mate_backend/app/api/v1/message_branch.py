@@ -32,7 +32,7 @@ def edit_message(
     with Session(database_service.engine) as session:
         # Verify user owns the conversation
         conv_repo = ConversationRepository(session)
-        conversation = conv_repo.get_by_id(conversation_id)
+        conversation = conv_repo.get_conversation_by_id(conversation_id, current_user.id)
 
         if not conversation or conversation.user_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
@@ -62,7 +62,7 @@ def get_message_versions(
     with Session(database_service.engine) as session:
         # Verify user owns the conversation
         conv_repo = ConversationRepository(session)
-        conversation = conv_repo.get_by_id(conversation_id)
+        conversation = conv_repo.get_conversation_by_id(conversation_id, current_user.id)
 
         if not conversation or conversation.user_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
@@ -79,7 +79,7 @@ def get_conversation_branches(conversation_id: UUID, current_user: User = Depend
     with Session(database_service.engine) as session:
         # Verify user owns the conversation
         conv_repo = ConversationRepository(session)
-        conversation = conv_repo.get_by_id(conversation_id)
+        conversation = conv_repo.get_conversation_by_id(conversation_id, current_user.id)
 
         if not conversation or conversation.user_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
@@ -100,7 +100,7 @@ def switch_branch(
     with Session(database_service.engine) as session:
         # Verify user owns the conversation
         conv_repo = ConversationRepository(session)
-        conversation = conv_repo.get_by_id(conversation_id)
+        conversation = conv_repo.get_conversation_by_id(conversation_id, current_user.id)
 
         if not conversation or conversation.user_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
@@ -120,7 +120,7 @@ def get_branch_tree(conversation_id: UUID, current_user: User = Depends(get_curr
     with Session(database_service.engine) as session:
         # Verify user owns the conversation
         conv_repo = ConversationRepository(session)
-        conversation = conv_repo.get_by_id(conversation_id)
+        conversation = conv_repo.get_conversation_by_id(conversation_id, current_user.id)
 
         if not conversation or conversation.user_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
