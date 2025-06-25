@@ -1,22 +1,27 @@
 # Latest User Requirements
 
-## 当前任务：修复消息分支测试问题
+## 当前任务：使用 Alembic 管理数据库迁移
 
-### 问题描述
-- test_get_message_versions 测试会hang住不结束
+### 任务描述
+- 使用 Alembic 管理项目的数据库 schema migrations
+- 清空现有数据库，用 Alembic 重建
 
-### 根本原因
-1. get_message_versions 方法中存在潜在的无限循环（当消息版本链形成循环引用时）
-2. 数据库约束设计不合理，导致编辑消息时违反唯一性约束
-3. 测试使用了错误的 fixture
+### 已完成
+1. ✅ 安装 Alembic 依赖
+2. ✅ 初始化 Alembic 配置
+3. ✅ 配置 Alembic 连接数据库（从环境变量读取 POSTGRES_URL）
+4. ✅ 创建初始迁移文件，解决循环依赖问题
+5. ✅ 清空现有数据库并执行迁移
+6. ✅ 整理旧的迁移文件到 old_migrations 目录
+7. ✅ 创建 Alembic 使用文档
 
-### 已完成修复
-1. ✅ 重写 get_message_versions 方法，添加循环检测机制
-2. ✅ 更新数据库约束，允许同一 message_index 在不同分支/版本中存在
-3. ✅ 修复测试中的 fixture 使用（mock_db_session → session）
-4. ✅ 修复 edit_message 服务中的异步调用问题
+### 关键变更
+1. 修改了 `alembic/env.py` 以支持 SQLModel 和从环境变量读取数据库配置
+2. 创建了初始迁移文件 `4a6711c4a20d_create_initial_tables.py`
+3. 创建了数据库清理脚本 `scripts/drop_all_tables.py`
+4. 创建了表列表脚本 `scripts/list_tables.py`
 
-### 待办事项
-1. 修复 API 测试中的 fixture 问题（test_message_branch_api.py）
-2. 完善消息编辑功能的异步 AI 响应生成
-3. 添加更多边界情况的测试用例
+### 后续建议
+1. 将旧的 SQL 迁移文件转换为 Alembic 迁移
+2. 在 CI/CD 流程中集成数据库迁移
+3. 为开发环境创建种子数据脚本
