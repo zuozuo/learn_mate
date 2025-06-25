@@ -301,7 +301,7 @@ class ApiService {
 
   // 创建新的聊天会话
   async createSession(): Promise<{ session_id: string; token: string }> {
-    const response = await fetch(`${this.baseUrl}/api/v1/auth/session`, {
+    const response = await fetch(`${this.baseUrl}/api/v1/sessions`, {
       method: 'POST',
       headers: this.getHeaders(),
     });
