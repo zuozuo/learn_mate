@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING, Optional
 from datetime import datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlmodel import Field, Relationship
 
@@ -25,7 +25,7 @@ class LoginHistory(BaseModel, table=True):
         user: Relationship to User model
     """
 
-    id: UUID = Field(default=None, primary_key=True)
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
     user_id: int = Field(foreign_key="user.id", index=True)
     ip_address: Optional[str] = Field(max_length=45)  # IPv6 max length
     user_agent: Optional[str] = Field(default=None)
