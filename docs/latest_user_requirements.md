@@ -1,76 +1,63 @@
 # Latest User Requirements
 
-## 当前任务：账号登录功能实现 - 第二阶段
+## 当前任务：清理旧认证代码
 
 ### 任务描述
-完成账号登录功能的实现，包括前后端集成和测试。
+清理 learn_mate_backend 中的旧认证代码，包括：
+1. 删除旧的 /register 和 /login 端点
+2. 删除相关测试文件
+3. 更新路由配置
 
 ### 已完成工作
 
-1. **设计文档**
-   - ✅ 创建了详细的设计文档 `docs/design/account-login-design.md`
+1. **清理 auth.py**
+   - ✅ 删除了 `/register` 端点（第170-204行）
+   - ✅ 删除了 `/login` 端点（第206-251行）
+   - ✅ 清理了不再需要的导入语句
+   - ✅ 保留了 session 相关的端点
 
-2. **后端实现**
-   - ✅ 扩展 User 模型添加认证字段（username, is_active, is_verified, last_login_at）
-   - ✅ 创建 LoginHistory 模型记录登录历史
-   - ✅ 实现 JWT 认证工具（JWTManager）
-   - ✅ 创建认证 API 端点（/auth/register, /auth/login, /auth/refresh, /auth/logout, /auth/me）
-   - ✅ 实现 AuthServiceSync 处理认证业务逻辑
-   - ✅ 修复同步/异步数据库不一致问题
+2. **删除测试文件**
+   - ✅ 删除了 `tests/api/v1/test_auth.py` 文件
 
-3. **前端实现**
-   - ✅ 创建 Login 组件（登录/注册界面）
-   - ✅ 实现 AuthContext 和 useAuth Hook
-   - ✅ 更新 authService 支持账号登录
-   - ✅ 集成登录界面到 NewTab 组件
-   - ✅ 添加登出功能
-
-4. **数据库迁移**
-   - ✅ 创建 Alembic 迁移添加认证字段
-   - ✅ 创建 login_history 表
+3. **更新路由配置**
+   - ✅ 修改 `app/api/v1/api.py`，将 auth_router 的前缀改为 `/sessions`
+   - ✅ 更新 auth.py 中的路由定义，适配新的前缀
 
 ### 当前问题
 
-1. **测试失败**
-   - 部分测试因为缺少 username 字段而失败
-   - 需要运行数据库迁移更新表结构
+执行 `before_commit.sh` 时测试失败，原因是：
+- 某些测试在创建用户时没有提供 username 字段
+- 数据库服务已经自动为用户生成默认 username
 
-2. **待完成工作**
-   - 修复所有测试，确保 before_commit.sh 通过
-   - 手动测试前后端集成的登录功能
-   - 添加密码重置功能（可选）
-   - 完善错误处理和用户提示
+### 路由变更总结
 
-### 技术要点
+旧路由：
+- `/api/v1/auth/register` -> 已删除
+- `/api/v1/auth/login` -> 已删除
+- `/api/v1/auth/session` -> `/api/v1/sessions`
+- `/api/v1/auth/session/{id}/name` -> `/api/v1/sessions/{id}/name`
+- `/api/v1/auth/session/{id}` -> `/api/v1/sessions/{id}`
+- `/api/v1/auth/sessions` -> `/api/v1/sessions`
 
-1. **认证流程**
-   - 使用 JWT 双令牌机制（access token + refresh token）
-   - 支持"记住我"功能（返回 refresh token）
-   - 登录历史记录追踪
-
-2. **安全措施**
-   - bcrypt 密码加密（cost factor 12）
-   - JWT 有效期：access token 1小时，refresh token 7天
-   - 登录失败记录
-
-3. **兼容性**
-   - 保留临时用户（访客模式）功能
-   - 支持从访客升级为注册用户
+新认证路由（在 account.py 中）：
+- `/api/v1/auth/register`
+- `/api/v1/auth/login`
+- `/api/v1/auth/refresh`
+- `/api/v1/auth/logout`
+- `/api/v1/auth/me`
 
 ### 下一步行动
 
-1. 运行数据库迁移：`alembic upgrade head`
-2. 修复测试中的 username 字段问题
-3. 手动测试登录功能：
-   - 注册新用户
-   - 登录/登出
-   - 访客模式
-   - Token 刷新
+1. 提交当前的代码变更
+2. 运行数据库迁移确保表结构最新
+3. 修复其他测试中的 username 字段问题（如果有）
 
 ### 相关文件
 
-- 设计文档：`/docs/design/account-login-design.md`
-- 后端认证：`/app/api/v1/account.py`, `/app/services/auth_service_sync.py`
-- 前端组件：`/pages/new-tab/src/components/Login.tsx`
-- 认证上下文：`/pages/new-tab/src/contexts/AuthContext.tsx`
-- 数据库迁移：`/alembic/versions/e0c85538e3c1_add_user_authentication_tables.py`
+- 修改的文件：
+  - `/app/api/v1/auth.py` - 删除了旧端点，保留 session 端点
+  - `/app/api/v1/api.py` - 更新了路由前缀
+  - 删除了 `/tests/api/v1/test_auth.py`
+- 新认证系统：
+  - `/app/api/v1/account.py` - 新的认证端点
+  - `/app/services/auth_service_sync.py` - 认证业务逻辑

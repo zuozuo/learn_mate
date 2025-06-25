@@ -89,11 +89,20 @@ class DatabaseService:
             User: The created user
         """
         with Session(self.engine) as session:
-            user = User(email=email, hashed_password=password)
+            # Generate a default username from email
+            username = email.split("@")[0]
+            # Ensure uniqueness by adding a suffix if needed
+            base_username = username
+            counter = 1
+            while session.exec(select(User).where(User.username == username)).first():
+                username = f"{base_username}{counter}"
+                counter += 1
+
+            user = User(email=email, username=username, hashed_password=password, is_active=True, is_verified=False)
             session.add(user)
             session.commit()
             session.refresh(user)
-            logger.info("user_created", email=email)
+            logger.info("user_created", email=email, username=username)
             return user
 
     async def get_user(self, user_id: int) -> Optional[User]:
