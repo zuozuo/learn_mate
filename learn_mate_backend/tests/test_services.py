@@ -121,7 +121,9 @@ class TestConversationService:
         service = ConversationService(session)
 
         # Create another user
-        other_user = User(email="other@test.com", hashed_password="hash")
+        other_user = User(
+            email="other@test.com", username="other_user", hashed_password="hash", is_active=True, is_verified=False
+        )
         session.add(other_user)
         session.commit()
 

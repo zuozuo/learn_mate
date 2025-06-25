@@ -104,7 +104,13 @@ class TestConversationFlow:
         # Create two users
         users = []
         for i in range(2):
-            user = User(email=f"user{i}@test.com", hashed_password=User.hash_password(f"pass{i}"))
+            user = User(
+                email=f"user{i}@test.com",
+                username=f"user{i}",
+                hashed_password=User.hash_password(f"pass{i}"),
+                is_active=True,
+                is_verified=False,
+            )
             session.add(user)
             users.append(user)
         session.commit()
