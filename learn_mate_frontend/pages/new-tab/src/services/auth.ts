@@ -44,7 +44,20 @@ class AuthService {
       username: response.user.username,
       email: response.user.email,
     };
-    this.setAuth(response.access_token, user);
+    
+    // 先设置用户 token
+    apiService.setToken(response.access_token);
+    
+    // 创建 session token 用于对话
+    try {
+      const sessionResponse = await apiService.createSession();
+      // 使用 session token 而不是用户 token
+      this.setAuth(sessionResponse.token, user);
+    } catch (error) {
+      console.error('Failed to create session after login:', error);
+      // 如果创建 session 失败，仍然保存用户 token
+      this.setAuth(response.access_token, user);
+    }
 
     // 如果有 refresh token，保存它
     if (response.refresh_token) {
