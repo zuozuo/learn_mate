@@ -1,37 +1,38 @@
 # Latest User Requirements
 
-## 当前任务：将旧的 SQL 迁移转换为 Alembic 迁移
+## 当前任务：修复 Chrome Extension 创建对话失败的问题
 
-### 任务描述
-- 将旧的 SQL 迁移文件转换为 Alembic 迁移
-- 确保所有数据库功能都由 Alembic 管理
+### 问题描述
+Chrome Extension 在尝试创建对话时出现 "Failed to create conversation" 错误，后端日志显示 "session_not_found" 404 错误。
 
-### 已完成
-1. ✅ 分析旧的 SQL 迁移文件内容
-2. ✅ 创建了两个新的 Alembic 迁移文件：
-   - `ae197ea51943_add_triggers_and_constraints.py` - 添加触发器和约束
-   - `84afc5dc20e9_add_conversation_update_trigger.py` - 添加对话更新触发器
-3. ✅ 移除了 `database.py` 中的触发器创建代码
-4. ✅ 删除了旧的迁移文件和 schema.sql
-5. ✅ 创建了触发器检查脚本 `scripts/check_triggers.py`
+### 问题分析
+1. **认证流程问题**：
+   - Chrome Extension 使用临时用户注册流程
+   - 创建用户后获得 user token，然后创建 session 获得 session token
+   - 使用 session token 覆盖了存储的 token
+   - 当 session 过期或被删除后，创建对话会失败
 
-### 关键变更
-1. **迁移文件结构**：
-   - 初始迁移：创建所有表结构
-   - 第二个迁移：添加触发器、函数和约束
-   - 第三个迁移：添加消息插入时更新对话的触发器
+2. **根本原因**：
+   - Session 在数据库中不存在（可能被清理或过期）
+   - 前端没有处理 session 失效的情况
 
-2. **触发器管理**：
-   - `update_message_branches_updated_at` - 自动更新分支的 updated_at
-   - `update_conversations_updated_at` - 自动更新对话的 updated_at
-   - `update_conversation_on_new_message` - 新消息时更新对话时间戳
+### 已完成的修复
+1. ✅ 在 `conversation.ts` 中添加了重试逻辑：
+   - 捕获 "Session not found" 错误
+   - 自动重新创建临时会话
+   - 重试创建对话请求
 
-3. **代码清理**：
-   - 移除了 `database.py` 中的触发器创建逻辑
-   - 删除了 `old_migrations/` 目录
-   - 删除了 `schema.sql` 文件
+2. ✅ 优化了 `auth.ts` 中的 `createTemporarySession` 方法：
+   - 首先尝试使用现有的 token 创建新 session
+   - 如果失败则清除无效的认证信息
+   - 重新创建临时用户和 session
+
+### 修改的文件
+- `/Users/zuozuo/workspace/projects/learn_mate/learn_mate_frontend/pages/new-tab/src/services/conversation.ts`
+- `/Users/zuozuo/workspace/projects/learn_mate/learn_mate_frontend/pages/new-tab/src/services/auth.ts`
 
 ### 后续建议
-1. 在 CI/CD 流程中集成数据库迁移
-2. 为开发环境创建种子数据脚本
-3. 添加迁移测试以确保迁移的可逆性
+1. 考虑在后端实现 session 自动续期机制
+2. 添加 session 有效期检查
+3. 实现更完善的错误处理和用户提示
+4. 考虑使用 refresh token 机制避免频繁创建新 session

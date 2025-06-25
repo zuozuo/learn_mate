@@ -78,10 +78,26 @@ class ConversationService {
   }
 
   async createConversation(data: ConversationCreateRequest): Promise<Conversation> {
-    return this.request<Conversation>('/api/v1/conversations', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    try {
+      return await this.request<Conversation>('/api/v1/conversations', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    } catch (error) {
+      // 如果是 session not found 错误，尝试重新创建 session
+      if (error instanceof Error && error.message.includes('Session not found')) {
+        // 重新创建临时会话
+        const { authService } = await import('./auth');
+        await authService.createTemporarySession();
+
+        // 重试创建对话
+        return this.request<Conversation>('/api/v1/conversations', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        });
+      }
+      throw error;
+    }
   }
 
   async updateConversation(id: string, data: ConversationUpdateRequest): Promise<Conversation> {

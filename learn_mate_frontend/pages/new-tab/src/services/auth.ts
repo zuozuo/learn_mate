@@ -67,6 +67,25 @@ class AuthService {
 
   // 创建临时会话用户（无需真实注册）
   async createTemporarySession(): Promise<User> {
+    // 检查是否已有有效的用户 token
+    const existingToken = this.getToken();
+    const existingUser = this.getUser();
+
+    // 如果已有用户信息，尝试创建新的 session
+    if (existingToken && existingUser) {
+      try {
+        // 尝试使用现有 token 创建新 session
+        apiService.setToken(existingToken);
+        const sessionResponse = await apiService.createSession();
+        this.setAuth(sessionResponse.token, existingUser);
+        return existingUser;
+      } catch (error) {
+        console.warn('Failed to create session with existing token:', error);
+        // 清除无效的认证信息
+        this.clearAuth();
+      }
+    }
+
     // 生成临时用户ID和邮箱
     const tempUserId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const tempEmail = `${tempUserId}@example.com`;
