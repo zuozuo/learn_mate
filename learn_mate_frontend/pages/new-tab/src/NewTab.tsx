@@ -7,7 +7,7 @@ import { conversationService } from './services/conversation';
 import { useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
 import { exampleThemeStorage } from '@extension/storage';
 import { cn, ErrorDisplay, LoadingSpinner, ToggleButton } from '@extension/ui';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import type { ConversationListRef } from './components/ConversationList';
 import type { Message as ApiMessage } from './services/api';
 import type { User } from './services/auth';
@@ -170,7 +170,7 @@ const NewTab = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [useStream, setUseStream] = useState(true);
+  const [useStream] = useState(true);
   const [thinkingContent, setThinkingContent] = useState('');
   const [showThinking, setShowThinking] = useState(false);
   const [isThinkingExpanded, setIsThinkingExpanded] = useState(true);
@@ -185,6 +185,23 @@ const NewTab = () => {
   const streamParserRef = useRef<StreamParser | null>(null);
   const thinkingContentRef = useRef<string>('');
   const conversationListRef = useRef<ConversationListRef>(null);
+
+  // URL 路由工具函数
+  const getConversationIdFromUrl = (): string | null => {
+    const hash = window.location.hash;
+    if (hash.startsWith('#conversation/')) {
+      return hash.replace('#conversation/', '');
+    }
+    return null;
+  };
+
+  const updateUrlWithConversationId = (conversationId: string | null) => {
+    if (conversationId) {
+      window.history.replaceState(null, '', `#conversation/${conversationId}`);
+    } else {
+      window.history.replaceState(null, '', '#');
+    }
+  };
 
   // 获取问候语
   const getGreeting = () => {
@@ -202,6 +219,42 @@ const NewTab = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // 会话管理函数
+  const loadConversation = useCallback(async (conversationId: string) => {
+    try {
+      setIsLoading(true);
+      const conversation = await conversationService.getConversation(conversationId);
+
+      // 转换消息格式
+      const convertedMessages: Message[] = conversation.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        thinking: msg.thinking,
+        timestamp: new Date(msg.created_at),
+      }));
+
+      setMessages(convertedMessages);
+      setCurrentConversationId(conversationId);
+
+      // 更新 URL
+      updateUrlWithConversationId(conversationId);
+
+      // 恢复thinking展开状态
+      const expandedIds = new Set<number>();
+      convertedMessages.forEach((msg, index) => {
+        if (msg.thinking) {
+          expandedIds.add(index);
+        }
+      });
+      setExpandedThinkingIds(expandedIds);
+    } catch (error) {
+      console.error('Failed to load conversation:', error);
+      alert('Failed to load conversation');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   // 初始化应用
   useEffect(() => {
@@ -232,6 +285,20 @@ const NewTab = () => {
         }
 
         setUser(currentUser);
+
+        // 5. 检查 URL 中是否有对话 ID，如果有则加载对应对话
+        if (currentUser && connected) {
+          const urlConversationId = getConversationIdFromUrl();
+          if (urlConversationId) {
+            try {
+              await loadConversation(urlConversationId);
+            } catch (error) {
+              console.error('Failed to load conversation from URL:', error);
+              // 如果加载失败，清除 URL 中的对话 ID
+              updateUrlWithConversationId(null);
+            }
+          }
+        }
       } catch (error) {
         console.error('App initialization failed:', error);
       } finally {
@@ -240,7 +307,7 @@ const NewTab = () => {
     };
 
     initApp();
-  }, []);
+  }, [loadConversation]);
 
   // 定期检查后端连接状态
   useEffect(() => {
@@ -255,38 +322,33 @@ const NewTab = () => {
     return () => clearInterval(interval);
   }, [isInitializing]);
 
-  // 会话管理函数
-  const loadConversation = async (conversationId: string) => {
-    try {
-      setIsLoading(true);
-      const conversation = await conversationService.getConversation(conversationId);
+  // 处理浏览器前进/后退按钮
+  useEffect(() => {
+    const handlePopState = async () => {
+      const urlConversationId = getConversationIdFromUrl();
 
-      // 转换消息格式
-      const convertedMessages: Message[] = conversation.messages.map(msg => ({
-        role: msg.role,
-        content: msg.content,
-        thinking: msg.thinking,
-        timestamp: new Date(msg.created_at),
-      }));
-
-      setMessages(convertedMessages);
-      setCurrentConversationId(conversationId);
-
-      // 恢复thinking展开状态
-      const expandedIds = new Set<number>();
-      convertedMessages.forEach((msg, index) => {
-        if (msg.thinking) {
-          expandedIds.add(index);
+      if (urlConversationId && urlConversationId !== currentConversationId) {
+        // URL 中有对话 ID 且与当前对话不同，加载新对话
+        try {
+          await loadConversation(urlConversationId);
+        } catch (error) {
+          console.error('Failed to load conversation from URL:', error);
+          // 如果加载失败，清除 URL 中的对话 ID
+          updateUrlWithConversationId(null);
+          setCurrentConversationId(null);
+          setMessages([]);
         }
-      });
-      setExpandedThinkingIds(expandedIds);
-    } catch (error) {
-      console.error('Failed to load conversation:', error);
-      alert('Failed to load conversation');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      } else if (!urlConversationId && currentConversationId) {
+        // URL 中没有对话 ID 但当前有对话，回到欢迎页面
+        setCurrentConversationId(null);
+        setMessages([]);
+        setExpandedThinkingIds(new Set());
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [currentConversationId, loadConversation]);
 
   const createNewConversation = async () => {
     try {
@@ -294,6 +356,9 @@ const NewTab = () => {
       setCurrentConversationId(conversation.id);
       setMessages([]);
       setExpandedThinkingIds(new Set());
+
+      // 更新 URL
+      updateUrlWithConversationId(conversation.id);
     } catch (error) {
       console.error('Failed to create conversation:', error);
       alert('Failed to create conversation');
@@ -313,6 +378,9 @@ const NewTab = () => {
         });
         conversationId = conversation.id;
         setCurrentConversationId(conversationId);
+
+        // 更新 URL
+        updateUrlWithConversationId(conversationId);
       } catch (error) {
         console.error('Failed to create conversation:', error);
         alert('Failed to create conversation');
@@ -588,36 +656,36 @@ const NewTab = () => {
     textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
   };
 
-  // 清空聊天历史
-  const clearChat = async () => {
-    try {
-      if (user && isConnected) {
-        await apiService.clearChatHistory();
-      }
-      setMessages([]);
-      // 清空thinking相关状态
-      setThinkingContent('');
-      thinkingContentRef.current = '';
-      setShowThinking(false);
-      setIsThinkingExpanded(true); // 重置为默认展开
-      setExpandedThinkingIds(new Set());
-      if (streamParserRef.current) {
-        streamParserRef.current.reset();
-      }
-    } catch (error) {
-      console.error('Failed to clear chat history:', error);
-      // 即使清空失败，也清空本地消息
-      setMessages([]);
-      setThinkingContent('');
-      thinkingContentRef.current = '';
-      setShowThinking(false);
-      setIsThinkingExpanded(true); // 重置为默认展开
-      setExpandedThinkingIds(new Set());
-      if (streamParserRef.current) {
-        streamParserRef.current.reset();
-      }
-    }
-  };
+  // 清空聊天历史功能暂时注释
+  // const clearChat = async () => {
+  //   try {
+  //     if (user && isConnected) {
+  //       await apiService.clearChatHistory();
+  //     }
+  //     setMessages([]);
+  //     // 清空thinking相关状态
+  //     setThinkingContent('');
+  //     thinkingContentRef.current = '';
+  //     setShowThinking(false);
+  //     setIsThinkingExpanded(true); // 重置为默认展开
+  //     setExpandedThinkingIds(new Set());
+  //     if (streamParserRef.current) {
+  //       streamParserRef.current.reset();
+  //     }
+  //   } catch (error) {
+  //     console.error('Failed to clear chat history:', error);
+  //     // 即使清空失败，也清空本地消息
+  //     setMessages([]);
+  //     setThinkingContent('');
+  //     thinkingContentRef.current = '';
+  //     setShowThinking(false);
+  //     setIsThinkingExpanded(true); // 重置为默认展开
+  //     setExpandedThinkingIds(new Set());
+  //     if (streamParserRef.current) {
+  //       streamParserRef.current.reset();
+  //     }
+  //   }
+  // };
 
   // 显示初始化加载状态
   if (isInitializing) {
@@ -713,7 +781,9 @@ const NewTab = () => {
         onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         className={cn(
           'fixed top-4 z-50 flex h-10 w-10 items-center justify-center rounded-full border transition-all duration-300',
-          isLight ? 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50' : 'border-gray-700 bg-gray-900 text-gray-400 hover:bg-gray-800',
+          isLight
+            ? 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+            : 'border-gray-700 bg-gray-900 text-gray-400 hover:bg-gray-800',
           isSidebarCollapsed ? 'left-4' : 'left-72',
         )}>
         <svg
@@ -726,7 +796,8 @@ const NewTab = () => {
       </button>
 
       {/* 主内容区域 */}
-      <div className={cn('flex min-h-screen flex-col transition-all duration-300', isSidebarCollapsed ? 'ml-0' : 'ml-64')}>
+      <div
+        className={cn('flex min-h-screen flex-col transition-all duration-300', isSidebarCollapsed ? 'ml-0' : 'ml-64')}>
         {messages.length === 0 ? (
           /* 欢迎界面 */
           <div className="flex flex-1 flex-col items-center justify-center px-8">
@@ -790,7 +861,22 @@ const NewTab = () => {
                     'disabled:cursor-not-allowed',
                   )}>
                   {isLoading ? (
-                    <LoadingSpinner size={50} />
+                    <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24">
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        fill="none"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
                   ) : (
                     <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
@@ -840,10 +926,10 @@ const NewTab = () => {
           </div>
         ) : (
           /* 聊天界面 */
-          <div className="flex h-screen flex-col">
+          <div className="flex flex-1 flex-col">
             {/* 消息列表 */}
             <div className="flex-1 overflow-y-auto">
-              <div className="mx-auto max-w-4xl px-8 py-8 pb-20">
+              <div className="mx-auto max-w-4xl px-8 py-8">
                 {messages.map((message, index) => {
                   const isLastMessage = index === messages.length - 1;
                   const messageThinking = isLastMessage && thinkingContent ? thinkingContent : message.thinking;
@@ -1204,8 +1290,8 @@ const NewTab = () => {
               </div>
             </div>
 
-            {/* 底部输入区域 */}
-            <div className="border-t border-inherit">
+            {/* 底部输入区域 - 固定在底部 */}
+            <div className="flex-shrink-0 border-t border-inherit bg-inherit">
               <div className="mx-auto max-w-4xl px-8 py-6">
                 <div className="relative">
                   <textarea
@@ -1250,7 +1336,22 @@ const NewTab = () => {
                       'disabled:cursor-not-allowed',
                     )}>
                     {isLoading ? (
-                      <LoadingSpinner size={50} />
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                          fill="none"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
                     ) : (
                       <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />

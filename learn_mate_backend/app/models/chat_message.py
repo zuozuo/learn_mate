@@ -1,7 +1,7 @@
 """Chat message model for storing individual messages in conversations."""
 
 from datetime import datetime, UTC
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, List
 from uuid import UUID, uuid4
 from enum import Enum
 
@@ -12,6 +12,7 @@ from app.models.base import BaseModel
 
 if TYPE_CHECKING:
     from app.models.conversation import Conversation
+    from app.models.message_branch import MessageBranch
 
 
 class MessageRole(str, Enum):
@@ -35,6 +36,13 @@ class ChatMessage(BaseModel, table=True):
         created_at: When the message was created
         metadata: Additional metadata as JSONB
         conversation: Relationship to conversation
+        branch_id: Foreign key to message branch
+        version_number: Version number within the branch
+        is_current_version: Whether this is the current version
+        parent_version_id: Parent version for tracking edit history
+        branch: Relationship to message branch
+        parent_version: Relationship to parent version
+        child_versions: Child versions of this message
     """
 
     __tablename__ = "chat_messages"
@@ -54,5 +62,20 @@ class ChatMessage(BaseModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), index=True)
     metadata_json: dict = Field(default_factory=dict, sa_column=Column(JSON))
 
+    # Branch-related fields
+    branch_id: Optional[UUID] = Field(default=None, foreign_key="message_branches.id", index=True)
+    version_number: int = Field(default=1, index=True)
+    is_current_version: bool = Field(default=True, index=True)
+    parent_version_id: Optional[UUID] = Field(default=None, foreign_key="chat_messages.id", index=True)
+
     # Relationships
     conversation: "Conversation" = Relationship(back_populates="messages")
+    branch: Optional["MessageBranch"] = Relationship(
+        back_populates="messages", sa_relationship_kwargs={"foreign_keys": "ChatMessage.branch_id"}
+    )
+    parent_version: Optional["ChatMessage"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "ChatMessage.parent_version_id", "remote_side": "ChatMessage.id"}
+    )
+    child_versions: List["ChatMessage"] = Relationship(
+        back_populates="parent_version", sa_relationship_kwargs={"foreign_keys": "ChatMessage.parent_version_id"}
+    )

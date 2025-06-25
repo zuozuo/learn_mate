@@ -191,9 +191,10 @@ class TestAuthAPI:
         mock_session = ChatSession(id=session_id, user_id=test_user.id, name="Test Session")
 
         # Mock the database service methods
-        with patch("app.api.v1.auth.db_service.get_session") as mock_get_session, \
-             patch("app.api.v1.auth.db_service.get_user") as mock_get_user:
-            
+        with (
+            patch("app.api.v1.auth.db_service.get_session") as mock_get_session,
+            patch("app.api.v1.auth.db_service.get_user") as mock_get_user,
+        ):
             # Make them return coroutines
             async def mock_async_get_session(sid):
                 return mock_session if sid == session_id else None

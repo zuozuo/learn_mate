@@ -12,6 +12,7 @@ from app.models.base import BaseModel
 if TYPE_CHECKING:
     from app.models.user import User
     from app.models.chat_message import ChatMessage
+    from app.models.message_branch import MessageBranch
 
 
 class Conversation(BaseModel, table=True):
@@ -51,3 +52,4 @@ class Conversation(BaseModel, table=True):
     # Relationships
     user: "User" = Relationship(back_populates="conversations")
     messages: List["ChatMessage"] = Relationship(back_populates="conversation", cascade_delete=True)
+    branches: List["MessageBranch"] = Relationship(back_populates="conversation", cascade_delete=True)
