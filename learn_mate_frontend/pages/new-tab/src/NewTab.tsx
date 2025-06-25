@@ -830,7 +830,14 @@ const NewTab = () => {
 
   // 如果未登录，显示登录界面
   if (!isAuthenticated) {
-    return <Login onLoginSuccess={() => {}} />;
+    return (
+      <Login
+        onLoginSuccess={() => {
+          // 登录成功后重新加载页面以刷新认证状态
+          window.location.reload();
+        }}
+      />
+    );
   }
 
   return (
