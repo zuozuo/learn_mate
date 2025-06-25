@@ -31,6 +31,16 @@ class ApiService {
     this.token = token;
   }
 
+  // 获取 baseUrl
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  // 获取认证 token
+  getAuthToken(): string | null {
+    return this.token;
+  }
+
   // 获取请求头
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = {

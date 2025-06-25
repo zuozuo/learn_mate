@@ -1,9 +1,12 @@
 import '@src/NewTab.css';
 import '@src/NewTab.scss';
 import { ConversationList } from './components/ConversationList';
+import { MessageEditor } from './components/MessageEditor';
+import { VersionSelector } from './components/VersionSelector';
 import { apiService } from './services/api';
 import { authService } from './services/auth';
 import { conversationService } from './services/conversation';
+import { messageBranchService } from './services/messageBranch';
 import { useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
 import { exampleThemeStorage } from '@extension/storage';
 import { cn, ErrorDisplay, LoadingSpinner, ToggleButton } from '@extension/ui';
@@ -12,10 +15,21 @@ import type { ConversationListRef } from './components/ConversationList';
 import type { Message as ApiMessage } from './services/api';
 import type { User } from './services/auth';
 
-// 扩展Message类型以包含thinking内容
+// 扩展Message类型以包含thinking内容和版本信息
 interface Message extends ApiMessage {
   thinking?: string;
   timestamp?: Date;
+  id?: string;
+  version_number?: number;
+  branch_id?: string;
+  branch_name?: string;
+  versions?: Array<{
+    id: string;
+    content: string;
+    version_number: number;
+    branch_id: string;
+    branch_name?: string;
+  }>;
 }
 
 // Stream Parser for handling <think> tags
@@ -180,6 +194,10 @@ const NewTab = () => {
   // 会话管理状态
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
 
+  // 消息编辑状态
+  const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
+  const [isEditLoading, setIsEditLoading] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const streamParserRef = useRef<StreamParser | null>(null);
@@ -232,6 +250,7 @@ const NewTab = () => {
         content: msg.content,
         thinking: msg.thinking,
         timestamp: new Date(msg.created_at),
+        id: msg.id,
       }));
 
       setMessages(convertedMessages);
@@ -566,6 +585,110 @@ const NewTab = () => {
       };
       setMessages(prev => [...prev, errorMessage]);
       setIsLoading(false);
+    }
+  };
+
+  // 处理消息编辑
+  const handleEditMessage = async (messageIndex: number, newContent: string) => {
+    const message = messages[messageIndex];
+    if (!message.id || !currentConversationId) return;
+
+    try {
+      setIsEditLoading(true);
+      const response = await messageBranchService.editMessage(
+        currentConversationId,
+        message.id,
+        newContent,
+        true, // 创建新分支
+      );
+
+      // 更新消息内容
+      const newMessages = [...messages];
+      newMessages[messageIndex] = {
+        ...newMessages[messageIndex],
+        content: response.message.content,
+        id: response.message.id,
+        version_number: response.message.version_number,
+        branch_id: response.message.branch_id,
+        branch_name: response.branch?.branch_name,
+      };
+
+      // 如果有新的助手回复，添加到消息列表
+      if (response.new_assistant_message) {
+        // 移除该消息之后的所有消息
+        const messagesUpToEdit = newMessages.slice(0, messageIndex + 1);
+
+        // 添加新的助手回复
+        messagesUpToEdit.push({
+          role: 'assistant',
+          content: response.new_assistant_message.content,
+          id: response.new_assistant_message.id,
+          timestamp: new Date(),
+        });
+
+        setMessages(messagesUpToEdit);
+      } else {
+        setMessages(newMessages);
+      }
+
+      setEditingMessageIndex(null);
+
+      // 刷新会话列表
+      conversationListRef.current?.refresh();
+    } catch (error) {
+      console.error('Failed to edit message:', error);
+      alert('编辑消息失败，请重试');
+    } finally {
+      setIsEditLoading(false);
+    }
+  };
+
+  // 加载消息版本
+  const loadMessageVersions = async (messageIndex: number) => {
+    const message = messages[messageIndex];
+    if (!message.id || !currentConversationId) return;
+
+    try {
+      const versions = await messageBranchService.getMessageVersions(currentConversationId, message.id);
+
+      if (versions.length > 1) {
+        // 更新消息的版本信息
+        const newMessages = [...messages];
+        newMessages[messageIndex] = {
+          ...newMessages[messageIndex],
+          versions: versions.map(v => ({
+            id: v.id,
+            content: v.content,
+            version_number: v.version_number,
+            branch_id: v.branch_id,
+            branch_name: v.branch_name,
+          })),
+        };
+        setMessages(newMessages);
+      }
+    } catch (error) {
+      console.error('Failed to load message versions:', error);
+    }
+  };
+
+  // 切换消息版本
+  const switchMessageVersion = async (messageIndex: number, versionNumber: number) => {
+    const message = messages[messageIndex];
+    if (!message.versions) return;
+
+    const targetVersion = message.versions.find(v => v.version_number === versionNumber);
+    if (!targetVersion) return;
+
+    // 切换到目标版本的分支
+    if (targetVersion.branch_id && currentConversationId) {
+      try {
+        await messageBranchService.switchBranch(currentConversationId, targetVersion.branch_id);
+
+        // 重新加载会话以获取该分支的消息
+        await loadConversation(currentConversationId);
+      } catch (error) {
+        console.error('Failed to switch branch:', error);
+      }
     }
   };
 
@@ -939,7 +1062,7 @@ const NewTab = () => {
                     <div key={index} className={cn('mb-4', isLastMessage && 'mb-0')}>
                       {message.role === 'user' ? (
                         /* 用户消息 - 头像在卡片内部 */
-                        <div className="flex justify-start">
+                        <div className="group relative flex justify-start">
                           <div
                             className={cn(
                               'flex items-start gap-3 rounded-2xl px-4 py-3',
@@ -952,9 +1075,58 @@ const NewTab = () => {
                               )}>
                               Z
                             </div>
-                            <div className="whitespace-pre-wrap break-words text-base leading-relaxed">
-                              {message.content}
+                            <div className="flex-1">
+                              {editingMessageIndex === index ? (
+                                <MessageEditor
+                                  content={message.content}
+                                  onSave={newContent => handleEditMessage(index, newContent)}
+                                  onCancel={() => setEditingMessageIndex(null)}
+                                  isLight={isLight}
+                                  isLoading={isEditLoading}
+                                />
+                              ) : (
+                                <div className="whitespace-pre-wrap break-words text-base leading-relaxed">
+                                  {message.content}
+                                </div>
+                              )}
                             </div>
+
+                            {/* 编辑按钮和版本选择器 */}
+                            {editingMessageIndex !== index && (
+                              <div className="ml-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                                <button
+                                  onClick={() => {
+                                    setEditingMessageIndex(index);
+                                    // 加载版本信息
+                                    loadMessageVersions(index);
+                                  }}
+                                  className={cn(
+                                    'flex h-7 w-7 items-center justify-center rounded-md transition-colors',
+                                    isLight ? 'text-gray-600 hover:bg-gray-200' : 'text-gray-400 hover:bg-gray-700',
+                                  )}
+                                  title="编辑消息">
+                                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                    />
+                                  </svg>
+                                </button>
+
+                                {/* 版本选择器 */}
+                                {message.versions && message.versions.length > 1 && (
+                                  <VersionSelector
+                                    currentVersion={message.version_number || 1}
+                                    totalVersions={message.versions.length}
+                                    onVersionChange={version => switchMessageVersion(index, version)}
+                                    isLight={isLight}
+                                    branchName={message.branch_name}
+                                  />
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       ) : (
