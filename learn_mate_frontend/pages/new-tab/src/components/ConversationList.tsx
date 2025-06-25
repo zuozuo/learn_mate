@@ -11,6 +11,7 @@ interface ConversationListProps {
   onSelectConversation: (id: string) => void;
   onCreateConversation: () => void;
   isLight?: boolean;
+  collapsed?: boolean;
 }
 
 export interface ConversationListRef {
@@ -18,7 +19,7 @@ export interface ConversationListRef {
 }
 
 export const ConversationList = forwardRef<ConversationListRef, ConversationListProps>(
-  ({ currentConversationId, onSelectConversation, onCreateConversation, isLight = true }, ref) => {
+  ({ currentConversationId, onSelectConversation, onCreateConversation, isLight = true, collapsed = false }, ref) => {
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -117,37 +118,41 @@ export const ConversationList = forwardRef<ConversationListRef, ConversationList
     const conversationGroups = groupConversationsByDate(conversations);
 
     return (
-      <div className={cn('conversation-list', isLight ? 'bg-gray-50' : 'bg-gray-900')}>
-        <div className={cn('conversation-list-header', isLight ? 'border-gray-200' : 'border-gray-800')}>
-          <button
-            className={cn(
-              'new-chat-button',
-              isLight
-                ? 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50'
-                : 'border-gray-700 bg-gray-800 text-gray-100 hover:bg-gray-700',
-            )}
-            onClick={onCreateConversation}
-            aria-label="New Chat">
-            <Plus size={18} />
-            <span>New Chat</span>
-          </button>
-        </div>
+      <div className={cn('conversation-list', !collapsed && (isLight ? 'bg-gray-50' : 'bg-gray-900'))}>
+        {!collapsed && (
+          <>
+            <div className={cn('conversation-list-header', isLight ? 'border-gray-200' : 'border-gray-800')}>
+              <button
+                className={cn(
+                  'new-chat-button',
+                  isLight
+                    ? 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50'
+                    : 'border-gray-700 bg-gray-800 text-gray-100 hover:bg-gray-700',
+                )}
+                onClick={onCreateConversation}
+                aria-label="New Chat">
+                <Plus size={18} />
+                <span>New Chat</span>
+              </button>
+            </div>
 
-        <div className="search-container">
-          <Search size={16} className={cn('search-icon', isLight ? 'text-gray-500' : 'text-gray-400')} />
-          <input
-            type="text"
-            placeholder="Search conversations..."
-            value={searchTerm}
-            onChange={handleSearch}
-            className={cn(
-              'search-input',
-              isLight
-                ? 'border-gray-200 bg-white text-gray-900 placeholder-gray-400'
-                : 'border-gray-700 bg-gray-800 text-gray-100 placeholder-gray-500',
-            )}
-          />
-        </div>
+            <div className="search-container">
+              <Search size={16} className={cn('search-icon', isLight ? 'text-gray-500' : 'text-gray-400')} />
+              <input
+                type="text"
+                placeholder="Search conversations..."
+                value={searchTerm}
+                onChange={handleSearch}
+                className={cn(
+                  'search-input',
+                  isLight
+                    ? 'border-gray-200 bg-white text-gray-900 placeholder-gray-400'
+                    : 'border-gray-700 bg-gray-800 text-gray-100 placeholder-gray-500',
+                )}
+              />
+            </div>
+          </>
+        )}
 
         <div className="conversations-container">
           {loading ? (

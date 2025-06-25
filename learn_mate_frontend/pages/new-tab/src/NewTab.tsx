@@ -11,7 +11,8 @@ import { conversationService } from './services/conversation';
 import { messageBranchService } from './services/messageBranch';
 import { useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
 import { exampleThemeStorage } from '@extension/storage';
-import { cn, ErrorDisplay, LoadingSpinner, ToggleButton } from '@extension/ui';
+import { cn, ErrorDisplay, LoadingSpinner } from '@extension/ui';
+import { Plus, MessageSquare } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { ConversationListRef } from './components/ConversationList';
 import type { Message as ApiMessage } from './services/api';
@@ -846,88 +847,148 @@ const NewTab = () => {
       <div
         className={cn(
           'fixed left-0 top-0 flex h-full flex-col border-r transition-all duration-300',
-          isLight ? 'border-gray-200 bg-gray-50' : 'border-gray-800 bg-gray-900',
-          isSidebarCollapsed ? 'w-0 overflow-hidden' : 'w-64',
+          isLight ? 'border-gray-200 bg-white' : 'border-gray-800 bg-gray-900',
+          isSidebarCollapsed ? 'w-16' : 'w-64',
         )}>
-        {/* 顶部标题 */}
-        <div className="border-b border-inherit p-4">
-          <div className="flex items-center space-x-3">
-            <div
-              className={cn(
-                'flex h-8 w-8 items-center justify-center rounded-lg text-lg',
-                isLight ? 'bg-orange-100 text-orange-600' : 'bg-orange-500/20 text-orange-400',
-              )}>
-              🎓
-            </div>
-            <div>
+        {!isSidebarCollapsed ? (
+          <>
+            {/* 展开状态 - 顶部标题 */}
+            <div className="flex items-center gap-2 p-4">
+              <div
+                className={cn(
+                  'flex h-7 w-7 items-center justify-center rounded-md text-lg',
+                  isLight ? 'bg-orange-100 text-orange-600' : 'bg-orange-500/20 text-orange-400',
+                )}>
+                🎓
+              </div>
               <h1 className={cn('text-lg font-semibold', isLight ? 'text-gray-900' : 'text-white')}>Learn Mate</h1>
             </div>
-          </div>
-        </div>
 
-        {/* 会话列表 */}
-        <ConversationList
-          ref={conversationListRef}
-          currentConversationId={currentConversationId || undefined}
-          onSelectConversation={loadConversation}
-          onCreateConversation={createNewConversation}
-          isLight={isLight}
-        />
-
-        {/* 底部设置 */}
-        <div className="space-y-3 border-t border-inherit p-4">
-          {/* 连接状态 */}
-          <div className="flex items-center justify-between">
-            <span className={cn('text-sm', isLight ? 'text-gray-600' : 'text-gray-300')}>连接状态</span>
-            <div className="flex items-center space-x-1">
-              <div className={cn('h-2 w-2 rounded-full', isConnected ? 'bg-green-500' : 'bg-red-500')} />
-              <span className={cn('text-xs', isLight ? 'text-gray-500' : 'text-gray-400')}>
-                {isConnected ? '已连接' : '未连接'}
-              </span>
+            {/* New Chat 按钮 */}
+            <div className="px-3 pb-4">
+              <button
+                onClick={createNewConversation}
+                className={cn(
+                  'flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
+                  isLight
+                    ? 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                    : 'border-gray-700 bg-gray-800 text-gray-200 hover:bg-gray-700',
+                )}>
+                <Plus size={16} />
+                New chat
+              </button>
             </div>
-          </div>
 
-          {/* 用户信息 */}
-          {user && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className={cn('text-sm', isLight ? 'text-gray-600' : 'text-gray-300')}>用户</span>
-                <span className={cn('text-xs', isLight ? 'text-gray-500' : 'text-gray-400')}>
-                  {user.username.startsWith('temp_') ? '游客模式' : user.username}
-                </span>
+            {/* 导航菜单 */}
+            <div className="flex-1 px-3">
+              <div className="space-y-1">
+                <button
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                    isLight ? 'text-gray-700 hover:bg-gray-100' : 'text-gray-200 hover:bg-gray-800',
+                  )}>
+                  <MessageSquare size={16} />
+                  Chats
+                </button>
               </div>
-              {user.email && (
-                <div className="flex items-center justify-between">
-                  <span className={cn('text-sm', isLight ? 'text-gray-600' : 'text-gray-300')}>邮箱</span>
-                  <span className={cn('max-w-[150px] truncate text-xs', isLight ? 'text-gray-500' : 'text-gray-400')}>
-                    {user.email}
-                  </span>
+
+              {/* 最近对话 */}
+              <div className="mt-6">
+                <div className={cn('px-3 py-2 text-xs font-medium', isLight ? 'text-gray-500' : 'text-gray-400')}>
+                  Recents
                 </div>
-              )}
+                <ConversationList
+                  ref={conversationListRef}
+                  currentConversationId={currentConversationId || undefined}
+                  onSelectConversation={loadConversation}
+                  onCreateConversation={createNewConversation}
+                  isLight={isLight}
+                  collapsed={false}
+                />
+              </div>
             </div>
-          )}
 
-          {/* 操作按钮 */}
-          <div className="flex items-center justify-between space-x-2">
-            {/* 主题切换按钮 */}
-            <ToggleButton onClick={exampleThemeStorage.toggle} className="flex-1 p-1">
-              <span className="text-lg">{isLight ? '🌙' : '☀️'}</span>
-            </ToggleButton>
+            {/* 底部用户信息 */}
+            {user && (
+              <div className={cn('border-t p-3', isLight ? 'border-gray-200' : 'border-gray-800')}>
+                <div className="flex items-center gap-3">
+                  <div
+                    className={cn(
+                      'flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium',
+                      isLight ? 'bg-gray-100 text-gray-700' : 'bg-gray-800 text-gray-200',
+                    )}>
+                    {user.username.startsWith('temp_') ? 'G' : user.username.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className={cn('truncate text-sm font-medium', isLight ? 'text-gray-900' : 'text-white')}>
+                      {user.email || 'Guest'}
+                    </div>
+                    <div className={cn('truncate text-xs', isLight ? 'text-gray-500' : 'text-gray-400')}>
+                      {user.username.startsWith('temp_') ? '游客模式' : 'Personal'}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      authService.logout();
+                      window.location.reload();
+                    }}
+                    className={cn(
+                      'rounded-md p-1 text-xs transition-colors',
+                      isLight ? 'text-gray-500 hover:bg-gray-100' : 'text-gray-400 hover:bg-gray-800',
+                    )}>
+                    登出
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            {/* 收起状态 - 仅显示图标 */}
+            <div className="flex flex-col items-center gap-4 py-4">
+              {/* Logo 图标 */}
+              <div
+                className={cn(
+                  'flex h-8 w-8 items-center justify-center rounded-lg text-lg',
+                  isLight ? 'bg-orange-100 text-orange-600' : 'bg-orange-500/20 text-orange-400',
+                )}>
+                🎓
+              </div>
 
-            {/* 登出按钮 */}
-            <button
-              onClick={() => {
-                authService.logout();
-                window.location.reload();
-              }}
-              className={cn(
-                'flex-1 rounded-md px-3 py-1 text-sm transition-colors',
-                isLight ? 'text-gray-600 hover:bg-gray-100' : 'text-gray-400 hover:bg-gray-800',
-              )}>
-              登出
-            </button>
-          </div>
-        </div>
+              {/* New Chat 图标 */}
+              <button
+                onClick={createNewConversation}
+                className={cn(
+                  'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
+                  isLight ? 'text-gray-600 hover:bg-gray-100' : 'text-gray-400 hover:bg-gray-800',
+                )}>
+                <Plus size={16} />
+              </button>
+
+              {/* Chats 图标 */}
+              <button
+                className={cn(
+                  'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
+                  isLight ? 'text-gray-600 hover:bg-gray-100' : 'text-gray-400 hover:bg-gray-800',
+                )}>
+                <MessageSquare size={16} />
+              </button>
+            </div>
+
+            {/* 底部用户头像 */}
+            {user && (
+              <div className="mt-auto p-3">
+                <div
+                  className={cn(
+                    'flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium',
+                    isLight ? 'bg-gray-100 text-gray-700' : 'bg-gray-800 text-gray-200',
+                  )}>
+                  {user.username.startsWith('temp_') ? 'G' : user.username.charAt(0).toUpperCase()}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* 侧边栏切换按钮 */}
@@ -938,7 +999,7 @@ const NewTab = () => {
           isLight
             ? 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
             : 'border-gray-700 bg-gray-900 text-gray-400 hover:bg-gray-800',
-          isSidebarCollapsed ? 'left-4' : 'left-72',
+          isSidebarCollapsed ? 'left-20' : 'left-4',
         )}>
         <svg
           className={cn('h-5 w-5 transition-transform duration-300', isSidebarCollapsed ? 'rotate-180' : '')}
@@ -951,7 +1012,10 @@ const NewTab = () => {
 
       {/* 主内容区域 */}
       <div
-        className={cn('flex min-h-screen flex-col transition-all duration-300', isSidebarCollapsed ? 'ml-0' : 'ml-64')}>
+        className={cn(
+          'flex min-h-screen flex-col transition-all duration-300',
+          isSidebarCollapsed ? 'ml-16' : 'ml-64',
+        )}>
         {messages.length === 0 ? (
           /* 欢迎界面 */
           <div className="flex flex-1 flex-col items-center justify-center px-8">
