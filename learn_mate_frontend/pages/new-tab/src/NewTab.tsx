@@ -1,5 +1,6 @@
 import '@src/NewTab.css';
 import '@src/NewTab.scss';
+import { ChatHistory } from './components/ChatHistory';
 import { ConversationList } from './components/ConversationList';
 import { Login } from './components/Login';
 import { MessageEditor } from './components/MessageEditor';
@@ -199,6 +200,9 @@ const NewTab = () => {
   // 消息编辑状态
   const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
   const [isEditLoading, setIsEditLoading] = useState(false);
+
+  // 对话历史页面状态
+  const [showChatHistory, setShowChatHistory] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -846,90 +850,136 @@ const NewTab = () => {
       {/* 左侧边栏 */}
       <div
         className={cn(
-          'fixed left-0 top-0 flex h-full flex-col border-r transition-all duration-300',
+          'fixed left-0 top-0 h-full overflow-hidden border-r transition-all duration-300 ease-in-out',
           isLight ? 'border-gray-200 bg-white' : 'border-gray-800 bg-gray-900',
           isSidebarCollapsed ? 'w-16' : 'w-64',
         )}>
-        {!isSidebarCollapsed ? (
-          <>
-            {/* 展开状态 - 顶部标题 */}
-            <div className="relative flex items-center gap-2 p-4">
-              <button
-                onClick={() => setIsSidebarCollapsed(true)}
-                className={cn(
-                  'absolute left-4 top-4 flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200',
-                  isLight ? 'text-gray-500 hover:bg-gray-100' : 'text-gray-400 hover:bg-gray-800',
-                )}>
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="2.5" y="2.5" width="15" height="15" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-                  <path d="M7.5 2.5V17.5" stroke="currentColor" strokeWidth="1.5" />
-                </svg>
-              </button>
-              <div className="flex items-center gap-2 pl-11">
-                <h1 className={cn('text-lg font-semibold', isLight ? 'text-gray-900' : 'text-white')}>Learn Mate</h1>
-              </div>
-            </div>
+        <div className="relative flex h-full flex-col">
+          {/* 顶部区域 */}
+          <div className="relative">
+            {/* 展开/收起按钮 - 始终可见 */}
+            <button
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className={cn(
+                'absolute left-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200',
+                isLight ? 'text-gray-500 hover:bg-gray-100' : 'text-gray-400 hover:bg-gray-800',
+              )}>
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="2.5" y="2.5" width="15" height="15" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M7.5 2.5V17.5" stroke="currentColor" strokeWidth="1.5" />
+              </svg>
+            </button>
 
-            {/* New Chat 按钮 */}
-            <div className="px-3 pb-4">
-              <button
-                onClick={createNewConversation}
+            {/* 标题 - 使用 opacity 和 transform 控制显示 */}
+            <div
+              className={cn(
+                'flex items-center gap-2 p-4 pl-[60px] transition-all duration-300',
+                isSidebarCollapsed ? '-translate-x-4 opacity-0' : 'translate-x-0 opacity-100',
+              )}>
+              <h1 className={cn('whitespace-nowrap text-lg font-semibold', isLight ? 'text-gray-900' : 'text-white')}>
+                Learn Mate
+              </h1>
+            </div>
+          </div>
+
+          {/* New Chat 按钮 */}
+          <div className="px-3 pb-4">
+            <button
+              onClick={createNewConversation}
+              className={cn(
+                'flex w-full items-center justify-center gap-3 rounded-lg border px-3 py-2 text-sm font-medium transition-all duration-300',
+                isLight
+                  ? 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                  : 'border-gray-700 bg-gray-800 text-gray-200 hover:bg-gray-700',
+                isSidebarCollapsed ? 'border-transparent' : '',
+              )}>
+              <Plus size={16} className="flex-shrink-0" />
+              <span
                 className={cn(
-                  'flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
-                  isLight
-                    ? 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                    : 'border-gray-700 bg-gray-800 text-gray-200 hover:bg-gray-700',
+                  'whitespace-nowrap transition-all duration-300',
+                  isSidebarCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100',
                 )}>
-                <Plus size={16} />
                 New chat
-              </button>
-            </div>
+              </span>
+            </button>
+          </div>
 
-            {/* 导航菜单 */}
-            <div className="flex-1 px-3">
-              <div className="space-y-1">
-                <button
-                  className={cn(
-                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                    isLight ? 'text-gray-700 hover:bg-gray-100' : 'text-gray-200 hover:bg-gray-800',
-                  )}>
-                  <MessageSquare size={16} />
-                  Chats
-                </button>
+          {/* 导航菜单 */}
+          <div className="flex-1 overflow-hidden px-3">
+            {/* Chats 按钮 */}
+            <button
+              onClick={() => setShowChatHistory(true)}
+              className={cn(
+                'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-300',
+                isLight ? 'text-gray-700 hover:bg-gray-100' : 'text-gray-200 hover:bg-gray-800',
+                isSidebarCollapsed ? 'justify-center' : '',
+              )}>
+              <MessageSquare size={16} className="flex-shrink-0" />
+              <span
+                className={cn(
+                  'whitespace-nowrap transition-all duration-300',
+                  isSidebarCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100',
+                )}>
+                Chats
+              </span>
+            </button>
+
+            {/* 最近对话 */}
+            <div className="mt-6">
+              <div
+                className={cn(
+                  'px-3 py-2 text-xs font-medium transition-all duration-300',
+                  isLight ? 'text-gray-500' : 'text-gray-400',
+                  isSidebarCollapsed ? 'h-0 opacity-0' : 'opacity-100',
+                )}>
+                Recents
               </div>
-
-              {/* 最近对话 */}
-              <div className="mt-6">
-                <div className={cn('px-3 py-2 text-xs font-medium', isLight ? 'text-gray-500' : 'text-gray-400')}>
-                  Recents
-                </div>
+              <div
+                className={cn(
+                  'transition-all duration-300',
+                  isSidebarCollapsed ? 'pointer-events-none opacity-0' : 'opacity-100',
+                )}>
                 <ConversationList
                   ref={conversationListRef}
                   currentConversationId={currentConversationId || undefined}
                   onSelectConversation={loadConversation}
                   onCreateConversation={createNewConversation}
                   isLight={isLight}
-                  collapsed={false}
+                  collapsed={isSidebarCollapsed}
                 />
               </div>
             </div>
+          </div>
 
-            {/* 底部用户信息 */}
-            {user && (
-              <div className={cn('border-t p-3', isLight ? 'border-gray-200' : 'border-gray-800')}>
-                <div className="flex items-center gap-3">
-                  <div
-                    className={cn(
-                      'flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium',
-                      isLight ? 'bg-gray-100 text-gray-700' : 'bg-gray-800 text-gray-200',
-                    )}>
-                    {user.username.startsWith('temp_') ? 'G' : user.username.charAt(0).toUpperCase()}
-                  </div>
+          {/* 底部用户信息 */}
+          {user && (
+            <div className={cn('border-t p-3', isLight ? 'border-gray-200' : 'border-gray-800')}>
+              <div className="flex items-center gap-3">
+                {/* 用户头像 - 始终显示 */}
+                <div
+                  className={cn(
+                    'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-medium transition-all duration-300',
+                    isLight ? 'bg-gray-100 text-gray-700' : 'bg-gray-800 text-gray-200',
+                  )}>
+                  {user.username.startsWith('temp_') ? 'G' : user.username.charAt(0).toUpperCase()}
+                </div>
+
+                {/* 用户信息和登出按钮 - 展开时显示 */}
+                <div
+                  className={cn(
+                    'flex min-w-0 flex-1 items-center gap-2 transition-all duration-300',
+                    isSidebarCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100',
+                  )}>
                   <div className="min-w-0 flex-1">
-                    <div className={cn('truncate text-sm font-medium', isLight ? 'text-gray-900' : 'text-white')}>
+                    <div
+                      className={cn(
+                        'truncate whitespace-nowrap text-sm font-medium',
+                        isLight ? 'text-gray-900' : 'text-white',
+                      )}>
                       {user.email || 'Guest'}
                     </div>
-                    <div className={cn('truncate text-xs', isLight ? 'text-gray-500' : 'text-gray-400')}>
+                    <div
+                      className={cn('truncate whitespace-nowrap text-xs', isLight ? 'text-gray-500' : 'text-gray-400')}>
                       {user.username.startsWith('temp_') ? '游客模式' : 'Personal'}
                     </div>
                   </div>
@@ -939,66 +989,16 @@ const NewTab = () => {
                       window.location.reload();
                     }}
                     className={cn(
-                      'rounded-md p-1 text-xs transition-colors',
+                      'whitespace-nowrap rounded-md p-1 text-xs transition-colors',
                       isLight ? 'text-gray-500 hover:bg-gray-100' : 'text-gray-400 hover:bg-gray-800',
                     )}>
                     登出
                   </button>
                 </div>
               </div>
-            )}
-          </>
-        ) : (
-          <>
-            {/* 收起状态 - 仅显示图标 */}
-            <div className="flex flex-col items-center gap-4 py-4">
-              {/* 展开按钮 */}
-              <button
-                onClick={() => setIsSidebarCollapsed(false)}
-                className={cn(
-                  'flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200',
-                  isLight ? 'text-gray-500 hover:bg-gray-100' : 'text-gray-400 hover:bg-gray-800',
-                )}>
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="2.5" y="2.5" width="15" height="15" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-                  <path d="M7.5 2.5V17.5" stroke="currentColor" strokeWidth="1.5" />
-                </svg>
-              </button>
-
-              {/* New Chat 图标 */}
-              <button
-                onClick={createNewConversation}
-                className={cn(
-                  'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
-                  isLight ? 'text-gray-600 hover:bg-gray-100' : 'text-gray-400 hover:bg-gray-800',
-                )}>
-                <Plus size={16} />
-              </button>
-
-              {/* Chats 图标 */}
-              <button
-                className={cn(
-                  'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
-                  isLight ? 'text-gray-600 hover:bg-gray-100' : 'text-gray-400 hover:bg-gray-800',
-                )}>
-                <MessageSquare size={16} />
-              </button>
             </div>
-
-            {/* 底部用户头像 */}
-            {user && (
-              <div className="mt-auto p-3">
-                <div
-                  className={cn(
-                    'flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium',
-                    isLight ? 'bg-gray-100 text-gray-700' : 'bg-gray-800 text-gray-200',
-                  )}>
-                  {user.username.startsWith('temp_') ? 'G' : user.username.charAt(0).toUpperCase()}
-                </div>
-              </div>
-            )}
-          </>
-        )}
+          )}
+        </div>
       </div>
 
       {/* 主内容区域 */}
@@ -1622,6 +1622,15 @@ const NewTab = () => {
           </div>
         )}
       </div>
+
+      {/* 对话历史页面 */}
+      <ChatHistory
+        isOpen={showChatHistory}
+        onClose={() => setShowChatHistory(false)}
+        onSelectConversation={loadConversation}
+        onCreateConversation={createNewConversation}
+        isLight={isLight}
+      />
     </div>
   );
 };

@@ -197,3 +197,32 @@ h6 {
     }
   }
 }
+
+// 侧边栏动画优化
+.sidebar-collapsed-text {
+  overflow: hidden;
+  transition:
+    width 0.3s ease-in-out,
+    opacity 0.3s ease-in-out;
+
+  &.collapsed {
+    width: 0;
+    opacity: 0;
+  }
+
+  &.expanded {
+    width: auto;
+    opacity: 1;
+  }
+}
+
+// 防止侧边栏动画时内容闪烁
+.sidebar-content {
+  transition:
+    opacity 0.3s ease-in-out,
+    transform 0.3s ease-in-out;
+
+  &.transitioning {
+    pointer-events: none;
+  }
+}
