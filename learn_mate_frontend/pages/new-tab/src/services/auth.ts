@@ -44,10 +44,10 @@ class AuthService {
       username: response.user.username,
       email: response.user.email,
     };
-    
+
     // 先设置用户 token
     apiService.setToken(response.access_token);
-    
+
     // 创建 session token 用于对话
     try {
       const sessionResponse = await apiService.createSession();
@@ -85,10 +85,25 @@ class AuthService {
   }
 
   // 初始化认证状态
-  init(): void {
+  async init(): Promise<void> {
     const token = this.getToken();
-    if (token) {
-      apiService.setToken(token);
+    const user = this.getUser();
+    if (token && user) {
+      // 检查这是否是 session token（临时会话）还是用户 token
+      try {
+        // 先设置 token
+        apiService.setToken(token);
+
+        // 尝试获取当前用户信息，如果成功说明是用户 token
+        await apiService.getCurrentUser();
+
+        // 如果是用户 token，需要创建新的 session
+        const sessionResponse = await apiService.createSession();
+        this.setAuth(sessionResponse.token, user);
+      } catch (error) {
+        // 如果失败，可能已经是 session token，保持原样
+        console.log('Token validation result:', error);
+      }
     }
   }
 

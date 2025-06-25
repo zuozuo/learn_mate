@@ -26,9 +26,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // 初始化时检查用户认证状态
   useEffect(() => {
-    const initAuth = () => {
+    const initAuth = async () => {
       try {
-        authService.init();
+        await authService.init();
         const storedUser = authService.getUser();
         if (storedUser) {
           setUser(storedUser);
