@@ -40,6 +40,7 @@ dependencies = [
     "transformers>=4.46.0",
     "torch>=2.0.0",
     "ipython>=9.3.0",
+    "alembic>=1.13.0",
 ]
 
 [tool.setuptools.packages.find]

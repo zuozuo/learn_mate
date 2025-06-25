@@ -46,7 +46,15 @@ class ChatMessage(BaseModel, table=True):
     """
 
     __tablename__ = "chat_messages"
-    __table_args__ = (UniqueConstraint("conversation_id", "message_index", name="unique_conversation_message_index"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "conversation_id",
+            "message_index",
+            "branch_id",
+            "version_number",
+            name="unique_conversation_message_branch_version",
+        ),
+    )
 
     id: UUID = Field(
         default_factory=uuid4,

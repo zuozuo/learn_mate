@@ -97,24 +97,52 @@ class MessageBranchRepository:
         if not original:
             return []
 
-        # Find the root message (version 1)
+        # Find the root message (version 1) with cycle detection
         root_id = original_message_id
+        visited_ids = {original_message_id}
+
         if original.parent_version_id:
             # Traverse up to find the root
             current = original
             while current.parent_version_id:
+                # Check for cycle
+                if current.parent_version_id in visited_ids:
+                    break
+
                 result = self.session.execute(select(ChatMessage).where(ChatMessage.id == current.parent_version_id))
                 parent = result.scalar_one_or_none()
                 if not parent:
                     break
+
+                visited_ids.add(parent.id)
                 current = parent
                 root_id = current.id
 
-        # Get all versions from the root
-        result = self.session.execute(
-            select(ChatMessage)
-            .where(or_(ChatMessage.id == root_id, ChatMessage.parent_version_id == root_id))
-            .order_by(ChatMessage.version_number)
-        )
+        # Get all versions by traversing the version tree
+        all_versions = []
+        to_process = [root_id]
+        processed = set()
 
-        return list(result.scalars().all())
+        while to_process:
+            current_id = to_process.pop(0)
+            if current_id in processed:
+                continue
+
+            processed.add(current_id)
+
+            # Get the current message
+            result = self.session.execute(select(ChatMessage).where(ChatMessage.id == current_id))
+            message = result.scalar_one_or_none()
+            if message:
+                all_versions.append(message)
+
+                # Find all messages that have this as parent
+                result = self.session.execute(select(ChatMessage).where(ChatMessage.parent_version_id == current_id))
+                children = result.scalars().all()
+                for child in children:
+                    if child.id not in processed:
+                        to_process.append(child.id)
+
+        # Sort by version number
+        all_versions.sort(key=lambda m: m.version_number)
+        return all_versions

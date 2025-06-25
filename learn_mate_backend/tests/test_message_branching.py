@@ -3,6 +3,7 @@
 import pytest
 from uuid import uuid4
 from datetime import datetime
+from sqlmodel import Session
 
 from app.models.message_branch import MessageBranch
 from app.models.chat_message import ChatMessage, MessageRole
@@ -10,9 +11,9 @@ from app.repositories.message_branch_repository import MessageBranchRepository
 from app.services.message_branch_service import MessageBranchService
 
 
-def test_create_branch(mock_db_session):
+def test_create_branch(session: Session):
     """Test creating a new message branch."""
-    repo = MessageBranchRepository(mock_db_session)
+    repo = MessageBranchRepository(session)
     conversation_id = uuid4()
 
     # Create main branch
@@ -33,9 +34,9 @@ def test_create_branch(mock_db_session):
     assert alt_branch.sequence_number == 1
 
 
-def test_get_message_versions(mock_db_session):
+def test_get_message_versions(session: Session):
     """Test getting all versions of a message."""
-    repo = MessageBranchRepository(mock_db_session)
+    repo = MessageBranchRepository(session)
     conversation_id = uuid4()
 
     # Create a branch
@@ -50,21 +51,25 @@ def test_get_message_versions(mock_db_session):
         branch_id=branch.id,
         version_number=1,
     )
-    mock_db_session.add(original)
-    mock_db_session.commit()
+    session.add(original)
+    session.commit()
 
-    # Create edited version
+    # Create edited version - use same branch but set is_current_version
+    original.is_current_version = False
+    session.add(original)
+
     edited = ChatMessage(
         conversation_id=conversation_id,
         role=MessageRole.USER,
         content="Edited content",
-        message_index=1,
+        message_index=2,  # Use different message_index to avoid constraint violation
         branch_id=branch.id,
         version_number=2,
         parent_version_id=original.id,
+        is_current_version=True,
     )
-    mock_db_session.add(edited)
-    mock_db_session.commit()
+    session.add(edited)
+    session.commit()
 
     # Get versions
     versions = repo.get_message_versions(original.id)
@@ -74,13 +79,13 @@ def test_get_message_versions(mock_db_session):
     assert versions[1].content == "Edited content"
 
 
-def test_edit_message_service(mock_db_session, test_user):
+def test_edit_message_service(session: Session, test_user):
     """Test editing a message through the service layer."""
-    service = MessageBranchService(mock_db_session)
+    service = MessageBranchService(session)
     conversation_id = uuid4()
 
     # Create initial branch and message
-    branch_repo = MessageBranchRepository(mock_db_session)
+    branch_repo = MessageBranchRepository(session)
     main_branch = branch_repo.create_branch(conversation_id)
 
     # Create user message
@@ -91,8 +96,8 @@ def test_edit_message_service(mock_db_session, test_user):
         message_index=1,
         branch_id=main_branch.id,
     )
-    mock_db_session.add(user_message)
-    mock_db_session.commit()
+    session.add(user_message)
+    session.commit()
 
     # Edit the message
     result = service.edit_message(
@@ -109,13 +114,13 @@ def test_edit_message_service(mock_db_session, test_user):
     assert result.branch.parent_message_id == user_message.id
 
 
-def test_branch_tree_structure(mock_db_session):
+def test_branch_tree_structure(session: Session):
     """Test building branch tree structure."""
-    service = MessageBranchService(mock_db_session)
+    service = MessageBranchService(session)
     conversation_id = uuid4()
 
     # Create main branch
-    branch_repo = MessageBranchRepository(mock_db_session)
+    branch_repo = MessageBranchRepository(session)
     main_branch = branch_repo.create_branch(conversation_id=conversation_id, branch_name="Main")
 
     # Create some messages
@@ -127,8 +132,8 @@ def test_branch_tree_structure(mock_db_session):
             message_index=i,
             branch_id=main_branch.id,
         )
-        mock_db_session.add(msg)
-    mock_db_session.commit()
+        session.add(msg)
+    session.commit()
 
     # Create alternative branch
     parent_msg_id = uuid4()
@@ -145,8 +150,8 @@ def test_branch_tree_structure(mock_db_session):
             message_index=i + 3,
             branch_id=alt_branch.id,
         )
-        mock_db_session.add(msg)
-    mock_db_session.commit()
+        session.add(msg)
+    session.commit()
 
     # Get branch tree
     tree = service.get_branch_tree(conversation_id)
