@@ -49,7 +49,7 @@ class TestConversationsAPI:
         """Test conversation creation without authentication."""
         response = client.post("/api/v1/conversations", json={"title": "Unauthorized"})
 
-        assert response.status_code == 403
+        assert response.status_code == 401
 
     def test_get_conversations_success(self, client: TestClient, auth_headers: dict, test_conversation: Conversation):
         """Test retrieving user's conversations."""
@@ -138,7 +138,13 @@ class TestConversationsAPI:
     ):
         """Test accessing another user's conversation."""
         # Create another user and their conversation
-        other_user = User(email="other@example.com", hashed_password=User.hash_password("password"))
+        other_user = User(
+            email="other@example.com",
+            username="other_user",
+            hashed_password=User.hash_password("password"),
+            is_active=True,
+            is_verified=False,
+        )
         session.add(other_user)
         session.commit()
 
@@ -193,8 +199,20 @@ class TestConversationsAPI:
     def test_conversation_isolation(self, client: TestClient, session: Session):
         """Test that users can only see their own conversations."""
         # Create two users with conversations
-        user1 = User(email="user1@test.com", hashed_password=User.hash_password("pass1"))
-        user2 = User(email="user2@test.com", hashed_password=User.hash_password("pass2"))
+        user1 = User(
+            email="user1@test.com",
+            username="user1",
+            hashed_password=User.hash_password("pass1"),
+            is_active=True,
+            is_verified=False,
+        )
+        user2 = User(
+            email="user2@test.com",
+            username="user2",
+            hashed_password=User.hash_password("pass2"),
+            is_active=True,
+            is_verified=False,
+        )
         session.add(user1)
         session.add(user2)
         session.commit()

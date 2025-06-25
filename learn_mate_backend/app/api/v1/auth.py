@@ -15,9 +15,9 @@ from fastapi import (
 )
 from fastapi.security import (
     HTTPAuthorizationCredentials,
-    HTTPBearer,
 )
 
+from app.api.v1.security import HTTPBearerWith401
 from app.core.logging import logger
 from app.models.session import Session
 from app.models.user import User
@@ -34,7 +34,7 @@ from app.utils.sanitization import (
 )
 
 router = APIRouter()
-security = HTTPBearer()
+security = HTTPBearerWith401()
 db_service = DatabaseService()
 
 
@@ -74,16 +74,16 @@ async def get_current_user(
             if session is None:
                 logger.error("session_not_found", session_id=token_value)
                 raise HTTPException(
-                    status_code=404,
-                    detail="Session not found",
+                    status_code=401,
+                    detail="Invalid authentication credentials",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
             user = await db_service.get_user(session.user_id)
             if user is None:
                 logger.error("user_not_found", user_id=session.user_id)
                 raise HTTPException(
-                    status_code=404,
-                    detail="User not found",
+                    status_code=401,
+                    detail="Invalid authentication credentials",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
             return user
@@ -94,8 +94,8 @@ async def get_current_user(
             if user is None:
                 logger.error("user_not_found", user_id=user_id_int)
                 raise HTTPException(
-                    status_code=404,
-                    detail="User not found",
+                    status_code=401,
+                    detail="Invalid authentication credentials",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
             return user
@@ -103,8 +103,8 @@ async def get_current_user(
     except ValueError as ve:
         logger.error("token_validation_failed", error=str(ve), exc_info=True)
         raise HTTPException(
-            status_code=422,
-            detail="Invalid token format",
+            status_code=401,
+            detail="Invalid authentication credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -153,8 +153,8 @@ async def get_current_session(
     except ValueError as ve:
         logger.error("token_validation_failed", error=str(ve), exc_info=True)
         raise HTTPException(
-            status_code=422,
-            detail="Invalid token format",
+            status_code=401,
+            detail="Invalid authentication credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

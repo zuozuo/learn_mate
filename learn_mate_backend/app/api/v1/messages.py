@@ -60,8 +60,8 @@ async def send_message(
     except HTTPException:
         # Re-raise HTTPExceptions without modification
         raise
-    except ValueError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Unauthorized")
     except Exception as e:
         logger.error("send_message_failed", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
