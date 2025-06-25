@@ -1,12 +1,13 @@
 """Account authentication API endpoints."""
 
 from typing import Optional, Annotated
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.services.database import DatabaseService
-from app.services.auth_service import AuthService
+from app.services.auth_service_sync import AuthServiceSync as AuthService
 from app.schemas.auth import UserRegister, UserLogin, LoginResponse, UserInfo, TokenRefreshRequest
 from app.models.user import User
 from app.core.jwt import JWTManager
@@ -17,14 +18,11 @@ security = HTTPBearer()
 db_service = DatabaseService()
 
 
-async def get_current_user(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)]
-) -> User:
+async def get_current_user(credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)]) -> User:
     """Get current authenticated user.
 
     Args:
         credentials: Bearer token credentials
-        db: Database session
 
     Returns:
         Current user
@@ -32,7 +30,7 @@ async def get_current_user(
     Raises:
         HTTPException: If authentication fails
     """
-    auth_service = AuthService(db)
+    auth_service = AuthService(db_service)
     user = await auth_service.get_current_user(credentials.credentials)
 
     if not user:
@@ -46,12 +44,11 @@ async def get_current_user(
 
 
 @router.post("/register", response_model=UserInfo, status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)) -> UserInfo:
+async def register(user_data: UserRegister) -> UserInfo:
     """Register a new user.
 
     Args:
         user_data: User registration data
-        db: Database session
 
     Returns:
         Created user information
@@ -59,7 +56,7 @@ async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)) 
     Raises:
         HTTPException: If registration fails
     """
-    auth_service = AuthService(db)
+    auth_service = AuthService(db_service)
     user = await auth_service.register_user(user_data)
 
     if not user:
@@ -69,13 +66,12 @@ async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)) 
 
 
 @router.post("/login", response_model=LoginResponse)
-async def login(login_data: UserLogin, request: Request, db: AsyncSession = Depends(get_db)) -> LoginResponse:
+async def login(login_data: UserLogin, request: Request) -> LoginResponse:
     """Login user and get access token.
 
     Args:
         login_data: Login credentials
         request: HTTP request
-        db: Database session
 
     Returns:
         Login response with tokens
@@ -87,7 +83,7 @@ async def login(login_data: UserLogin, request: Request, db: AsyncSession = Depe
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("User-Agent")
 
-    auth_service = AuthService(db)
+    auth_service = AuthService(db_service)
     login_response = await auth_service.login_user(login_data, ip_address=ip_address, user_agent=user_agent)
 
     if not login_response:
@@ -97,12 +93,11 @@ async def login(login_data: UserLogin, request: Request, db: AsyncSession = Depe
 
 
 @router.post("/refresh")
-async def refresh_token(refresh_data: TokenRefreshRequest, db: AsyncSession = Depends(get_db)) -> dict:
+async def refresh_token(refresh_data: TokenRefreshRequest) -> dict:
     """Refresh access token using refresh token.
 
     Args:
         refresh_data: Refresh token request
-        db: Database session
 
     Returns:
         New access token
@@ -110,7 +105,7 @@ async def refresh_token(refresh_data: TokenRefreshRequest, db: AsyncSession = De
     Raises:
         HTTPException: If refresh fails
     """
-    auth_service = AuthService(db)
+    auth_service = AuthService(db_service)
     token_response = await auth_service.refresh_token(refresh_data.refresh_token)
 
     if not token_response:
