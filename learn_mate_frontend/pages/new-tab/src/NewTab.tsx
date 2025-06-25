@@ -3,6 +3,7 @@ import '@src/NewTab.scss';
 import { ConversationList } from './components/ConversationList';
 import { MessageEditor } from './components/MessageEditor';
 import { VersionSelector } from './components/VersionSelector';
+import { MarkdownViewer } from './components/MarkdownViewer';
 import { apiService } from './services/api';
 import { authService } from './services/auth';
 import { conversationService } from './services/conversation';
@@ -693,6 +694,8 @@ const NewTab = () => {
   };
 
   // 格式化内容，处理段落和代码块
+  // formatContent 函数已被 MarkdownViewer 组件替代
+  /*
   const formatContent = (content: string): React.ReactNode => {
     // 如果内容为空或只有空白字符，返回null
     if (!content || !content.trim()) {
@@ -760,6 +763,7 @@ const NewTab = () => {
 
     return elements;
   };
+  */
 
   // 处理键盘事件
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -1202,7 +1206,7 @@ const NewTab = () => {
                                         'animate-fadeIn thinking-content px-4 pb-6 text-sm leading-relaxed',
                                         isLight ? 'text-gray-700' : 'dark text-gray-300',
                                       )}>
-                                      {formatContent(messageThinking)}
+                                      <MarkdownViewer content={messageThinking} isLight={isLight} />
                                     </div>
                                   </>
                                 ) : (
@@ -1263,7 +1267,7 @@ const NewTab = () => {
                                 isLight ? 'text-gray-900' : 'dark text-gray-100',
                               )}>
                               {message.content
-                                ? formatContent(message.content)
+                                ? <MarkdownViewer content={message.content} isLight={isLight} />
                                 : isLoading &&
                                   isLastMessage && <span className="inline-block h-4 w-2 animate-pulse bg-current" />}
                             </div>

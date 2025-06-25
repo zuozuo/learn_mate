@@ -1,0 +1,109 @@
+.ProseMirror {
+  &:focus {
+    outline: none;
+  }
+
+  h1 {
+    @apply text-2xl font-bold mb-4 mt-6;
+  }
+
+  h2 {
+    @apply text-xl font-semibold mb-3 mt-5;
+  }
+
+  h3 {
+    @apply text-lg font-semibold mb-2 mt-4;
+  }
+
+  h4 {
+    @apply text-base font-semibold mb-2 mt-3;
+  }
+
+  p {
+    @apply mb-4 leading-relaxed;
+  }
+
+  ul,
+  ol {
+    @apply mb-4 pl-6;
+  }
+
+  ul {
+    @apply list-disc;
+  }
+
+  ol {
+    @apply list-decimal;
+  }
+
+  li {
+    @apply mb-1;
+  }
+
+  blockquote {
+    @apply border-l-4 border-gray-300 pl-4 italic my-4;
+  }
+
+  code {
+    @apply px-1.5 py-0.5 rounded text-sm;
+  }
+
+  pre {
+    @apply mb-4;
+
+    code {
+      @apply block p-4 rounded-lg text-sm leading-relaxed overflow-x-auto;
+    }
+  }
+
+  a {
+    @apply underline;
+  }
+
+  strong {
+    @apply font-semibold;
+  }
+
+  em {
+    @apply italic;
+  }
+
+  hr {
+    @apply my-6 border-t;
+  }
+
+  table {
+    @apply w-full mb-4 border-collapse;
+
+    th,
+    td {
+      @apply border px-3 py-2 text-left;
+    }
+
+    th {
+      @apply font-semibold;
+    }
+  }
+
+  /* 暗色主题样式 */
+  &.dark {
+    blockquote {
+      @apply border-gray-600;
+    }
+
+    code {
+      @apply bg-gray-800 text-gray-200;
+    }
+
+    table {
+      th,
+      td {
+        @apply border-gray-700;
+      }
+
+      th {
+        @apply bg-gray-800;
+      }
+    }
+  }
+}
